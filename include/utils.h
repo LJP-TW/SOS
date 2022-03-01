@@ -1,5 +1,5 @@
-#ifndef	_UTILS_H
-#define	_UTILS_H
+#ifndef _UTILS_H
+#define _UTILS_H
 
 void delay(unsigned long);
 void put32(unsigned long, unsigned int);
