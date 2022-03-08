@@ -8,3 +8,15 @@ int strcmp(char *str1, char *str2)
 
     return c1 - c2;
 }
+
+int strncmp(char *str1, char *str2, int n)
+{
+    char c1, c2;
+
+    if (n <= 0)
+        return 0;
+
+    while ((c1 = *str1++) == (c2 = *str2++) && c1 && c2 && --n > 0) {};
+
+    return n ? c1 - c2 : 0;
+}

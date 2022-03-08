@@ -5,6 +5,8 @@ LD := $(CROSS_COMPILE)ld
 BUILD_DIR   = build
 SRC_DIR     = src
 INCLUDE_DIR = include
+INITRAMFS_DIR = initramfs
+IMG_DIR     = img
 
 BOOTLOADER_DIR = bootloader
 KERNEL_DIR     = kernel
@@ -19,7 +21,10 @@ BOOTLOADER_ELF := $(BUILD_DIR)/bootloader.elf
 KERNEL_IMG := $(BUILD_DIR)/kernel8.img
 KERNEL_ELF := $(BUILD_DIR)/kernel8.elf
 IMG_NAME   := $(BUILD_DIR)/myos.img
+INITRAMFS_CPIO := $(BUILD_DIR)/initramfs.cpio
 
+IMG_FILES             = $(wildcard $(IMG_DIR)/*)
+INITRAMFS_FILES       = $(wildcard $(INITRAMFS_DIR)/*)
 BOOTLOADER_C_FILES    = $(wildcard $(SRC_DIR)/$(BOOTLOADER_DIR)/*.c)
 BOOTLOADER_ASM_FILES  = $(wildcard $(SRC_DIR)/$(BOOTLOADER_DIR)/*.S)
 BOOTLOADER_OBJ_FILES  = $(BOOTLOADER_ASM_FILES:$(SRC_DIR)/$(BOOTLOADER_DIR)/%.S=$(BUILD_DIR)/$(BOOTLOADER_DIR)/%_s.o)
@@ -71,11 +76,15 @@ $(BUILD_DIR)/$(LIB_DIR)/%_c.o: $(SRC_DIR)/$(LIB_DIR)/%.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -I$(INCLUDE_DIR)/$(LIB_DIR) -c $< -o $@
 
-qemu: $(KERNEL_IMG)
-	qemu-system-aarch64 -M raspi3 -kernel $(KERNEL_IMG) -display none \
-					    -serial null -serial pty
+$(INITRAMFS_CPIO): $(INITRAMFS_FILES)
+	cd initramfs; find . | cpio -o -H newc > ../$(INITRAMFS_CPIO)
 
-image: $(BOOTLOADER_IMG) $(IMG_NAME) 
+qemu: $(KERNEL_IMG) $(INITRAMFS_CPIO)
+	qemu-system-aarch64 -M raspi3 -kernel $(KERNEL_IMG) -display none \
+						-initrd $(INITRAMFS_CPIO) \
+					    -serial null -serial pty -s -S
+
+image: $(BOOTLOADER_IMG) $(IMG_NAME) $(INITRAMFS_CPIO) $(IMG_FILES)
 	./tools/buildimg.sh $^
 
 # Empty Target
@@ -91,4 +100,4 @@ clean:
 
 .PHONY: clean-all
 clean-all: clean
-	rm -f $(KERNEL_IMG) $(BOOTLOADER_IMG) $(IMG_NAME)
+	rm -f $(KERNEL_IMG) $(BOOTLOADER_IMG) $(IMG_NAME) $(INITRAMFS_CPIO)

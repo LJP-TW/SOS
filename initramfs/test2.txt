@@ -1,0 +1,3 @@
+This is start of test2.txt
+hello, bye.
+This is end of test2.txt

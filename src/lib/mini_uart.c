@@ -48,6 +48,13 @@ void uart_send(char c)
     put32(AUX_MU_IO_REG, c);
 }
 
+void uart_sendn(char *str, int n)
+{
+    while (n--) {
+        uart_send(*str++);
+    }
+}
+
 char uart_recv(void)
 {
     while (!(get32(AUX_MU_LSR_REG) & 0x01)) {};

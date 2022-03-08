@@ -6,6 +6,7 @@ void uart_init(void);
 char uart_recv(void);
 unsigned int uart_recv_uint(void);
 void uart_send(char c);
+void uart_sendn(char *str, int n);
 void uart_send_string(char *str);
 void uart_send_uint(unsigned int num);
 

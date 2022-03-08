@@ -1,4 +1,5 @@
 _stack_top = 0x400000;
+_initramfs = 0x8000000;
 
 SECTIONS
 {
@@ -17,6 +18,8 @@ SECTIONS
   }
 
   .data : {
+    *(.got)
+    *(.got.plt)
     *(.data)
   }
 

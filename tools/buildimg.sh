@@ -2,6 +2,7 @@
 
 # $1: bootloader.img
 # $2: target.img (which will be dd to sd-card)
+# $3: initramfs.cpio
 
 echo "[*] Mount $2 to ./mnt ..."
 mkdir -p mnt
@@ -34,6 +35,9 @@ sudo cp $1 mnt/bootloader.img
 
 # echo "[*] Copy kernel image prebuild/kernel8.img to $2 ..."
 # sudo cp prebuild/kernel8.img mnt/kernel8.img
+
+echo "[*] Copy initrmafs.cpio $3 to $2 ..."
+sudo cp $3 mnt/initramfs.cpio
 
 echo "[*] Umount $2 ..."
 sudo umount mnt
