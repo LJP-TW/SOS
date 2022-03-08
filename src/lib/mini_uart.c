@@ -3,6 +3,17 @@
 #include <BCM2837.h>
 #include <utils.h>
 
+unsigned int uart_recv_uint(void)
+{
+    char buf[4];
+    
+    for (int i = 0; i < 4; ++i) {
+        buf[i] = uart_recv();
+    }
+
+    return *((unsigned int*)buf);
+}
+
 int uart_recvline(char *buff, int maxlen)
 {
     int cnt = 0;

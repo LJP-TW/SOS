@@ -5,12 +5,46 @@
 
 #define BUFSIZE 0x100
 
+extern char _kernel[];
 char shell_buf[BUFSIZE];
 
-void start_kernel(void)
+typedef void (*funcp)(void);
+
+static void load_kernel(void)
+{
+    // Loading kernel Protocol:
+    //  4 bytes: The kernel image length n
+    //  n bytes: The kernel image
+    // Bootloader will store kernel to 0x80000 and then jump to it
+    unsigned int len;
+    char *p = _kernel;
+
+    uart_send_string("\r\n");
+    uart_send_string("[*] Kernel base address: ");
+    uart_send_uint((unsigned int)_kernel);
+
+    len = uart_recv_uint();
+
+    uart_send_string("\r\n");
+    uart_send_string("[*] Kernel image length: ");
+    uart_send_uint(len);
+
+    while (len--) {
+        *p++ = uart_recv();
+    }
+
+    uart_send_string("\r\n");
+    uart_send_string("[*] Kernel loaded!");
+    uart_send_string("\r\n");
+
+    // Execute kernel
+    ((funcp)_kernel)();
+}
+
+void start_bootloader(void)
 {
     uart_init();
-    uart_send_string("Hello, world!\r\n");
+    uart_send_string("[*] Bootloader\r\n");
 
     while (1) {
         uart_send_string("# ");
@@ -20,7 +54,8 @@ void start_kernel(void)
             uart_send_string(
                 "help\t: "   "print this help menu" "\r\n"
                 "hello\t: "  "print Hello World!"   "\r\n"
-                "hwinfo\t: " "print hardware info"   "\r\n"
+                "hwinfo\t: " "print hardware info"  "\r\n"
+                "load\t: "   "load kernel"          "\r\n"
                 "reboot\t: " "reboot the device"
             );
         } else if (!strcmp("hello", shell_buf)) {
@@ -45,6 +80,9 @@ void start_kernel(void)
         } else if (!strcmp("reboot", shell_buf)) {
             uart_send_string("Reboot!");
             BCM2837_reset(10);
+        } else if (!strcmp("load", shell_buf)) {
+            uart_send_string("[*] Loading kernel ...");
+            load_kernel();
         } else {
             uart_send_string(shell_buf);
         }
