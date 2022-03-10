@@ -21,11 +21,6 @@ struct cpio_newc_header {
     char    c_check[8];
 };
 
-typedef unsigned long long int uint64;
-typedef unsigned int uint32;
-typedef unsigned short uint16;
-typedef unsigned char uint8;
-
 // Convert "0000000A" to 10
 static uint32 _cpio_read_8hex(char *p)
 {
