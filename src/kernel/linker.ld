@@ -1,4 +1,6 @@
 _stack_top = 0x400000;
+_smem      = 0x7000000;
+_emem      = 0x7ffffff;
 _initramfs = 0x8000000;
 
 SECTIONS
@@ -20,7 +22,7 @@ SECTIONS
   .data : {
     *(.got)
     *(.got.plt)
-    *(.data)
+    *(.data*)
   }
 
   _sbss = .;
