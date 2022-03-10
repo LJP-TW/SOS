@@ -1,5 +1,6 @@
 #include <cpio.h>
 #include <mini_uart.h>
+#include <string.h>
 
 #define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
 
@@ -75,16 +76,16 @@ void cpio_ls(char *cpio)
         uint32 adj_filesize = ALIGN(filesize, 4);
         char *filename  = cur;
         cur += adj_namesize;
-        char *content   = cur;
+        // char *content   = cur;
         cur += adj_filesize;
-
-        uart_send_string(filename);
-        uart_send_string("\r\n");
 
         // TRAILER!!!
         if (namesize == 0xb && !strcmp(filename, "TRAILER!!!")) {
             return;
         }
+
+        uart_send_string(filename);
+        uart_send_string("\r\n");
     }
 }
 
