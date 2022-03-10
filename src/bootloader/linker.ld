@@ -4,7 +4,7 @@ _stack_top  = 0x400000;
 
 SECTIONS
 {
-  . = _bootloader;
+  . = _kernel;
   
   .text.boot : {
     *(.text.boot)
@@ -23,6 +23,7 @@ SECTIONS
     *(.got.plt)
     *(.data)
   }
+  _edata = .;
 
   _sbss = .;
   .bss : {
