@@ -5,6 +5,6 @@
 
 void memzero(unsigned long src, unsigned long n);
 
-#endif
+#endif /* __ASSEMBLER__ */
 
-#endif  /* _MM_H */
+#endif /* _MM_H */
