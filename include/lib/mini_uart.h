@@ -1,13 +1,16 @@
 #ifndef _MINI_UART_H
 #define _MINI_UART_H
 
-int uart_recvline(char *buff, int maxlen);
+#include <types.h>
+
+uint32 uart_recvline(char *buff, int maxlen);
 void uart_init(void);
 char uart_recv(void);
-unsigned int uart_recv_uint(void);
+uint32 uart_recv_uint(void);
 void uart_send(char c);
 void uart_sendn(char *str, int n);
-void uart_send_string(char *str);
-void uart_send_uint(unsigned int num);
+void uart_send_string(const char *str);
+void uart_send_uint(uint32 num);
+void uart_printf(char *fmt, ...);
 
 #endif  /* _MINI_UART_H */
