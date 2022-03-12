@@ -65,33 +65,10 @@ char uart_recv(void)
     return (get32(AUX_MU_IO_REG) & 0xFF);
 }
 
-void uart_send_string(const char *str)
+static void uart_send_string(const char *str)
 {
     for (int i = 0; str[i] != '\0'; i++) {
         uart_send(str[i]);
-    }
-}
-
-/*
- * Send hex uint to UART
- */
-void uart_send_uint(unsigned int num)
-{
-    int shift = 32;
-    uart_send_string("0x");
-
-    while (shift) {
-        int n = num >> (shift - 4) & 0xf;
-
-        if (0 <= n && n <= 9) {
-            char c = '0' + n;
-            uart_send(c);
-        } else {
-            char c = 'A' + n - 10;
-            uart_send(c);
-        }
-
-        shift -= 4;
     }
 }
 

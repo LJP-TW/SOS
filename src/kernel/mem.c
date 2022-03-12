@@ -14,7 +14,7 @@ void *simple_malloc(size_t size)
     char *tmp;
 
     if ((uint64)cur + size > (uint64)EMEM) {
-        uart_send_string("[!] No enough space!\r\n");
+        uart_printf("[!] No enough space!\r\n");
         return 0;
     }
 

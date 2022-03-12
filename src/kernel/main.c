@@ -15,7 +15,7 @@ char *fdt_base;
 
 static void cmd_help(void)
 {
-    uart_send_string(
+    uart_printf(
                 "cat <filename>\t: " "get file content"  "\r\n"
                 "help\t: "   "print this help menu" "\r\n"
                 "hello\t: "  "print Hello World!"   "\r\n"
@@ -28,7 +28,7 @@ static void cmd_help(void)
 
 static void cmd_hello(void)
 {
-    uart_send_string("Hello World!\r\n");
+    uart_printf("Hello World!\r\n");
 }
 
 static void cmd_hwinfo(void)
@@ -38,23 +38,17 @@ static void cmd_hwinfo(void)
 
     // Board revision
     rev = get_board_revision();
-    uart_send_string("[*] Revision: ");
-    uart_send_uint(rev);
-    uart_send_string("\r\n");
+    uart_printf("[*] Revision: %x\r\n", rev);
 
     // ARM memory base address and size
     get_arm_memory(&ami);
-    uart_send_string("[*] ARM memory base address: ");
-    uart_send_uint(ami.baseaddr);
-    uart_send_string("\r\n");
-    uart_send_string("[*] ARM memory size: ");
-    uart_send_uint(ami.size);
-    uart_send_string("\r\n");
+    uart_printf("[*] ARM memory base address: %x\r\n", ami.baseaddr);
+    uart_printf("[*] ARM memory size: %d\r\n", ami.size);
 }
 
 static void cmd_reboot(void)
 {
-    uart_send_string("Reboot!\r\n");
+    uart_printf("Reboot!\r\n");
     BCM2837_reset(10);
 }
 
@@ -82,9 +76,9 @@ static void shell(void)
 {
     while (1) {
         int cmd_len;
-        uart_send_string("# ");
+        uart_printf("# ");
         cmd_len = shell_read_cmd();
-        uart_send_string("\r\n");
+        uart_printf("\r\n");
         if (!strcmp("help", shell_buf)) {
             cmd_help();
         } else if (!strcmp("hello", shell_buf)) {
@@ -103,8 +97,7 @@ static void shell(void)
             }
         } else {
             // Just echo back
-            uart_send_string(shell_buf);
-            uart_send_string("\r\n");
+            uart_printf("%s\r\n", shell_buf);
         }
     }
 }
@@ -151,7 +144,7 @@ void start_kernel(char *fdt)
 
     uart_init();
     uart_printf("[*] fdt base: %x\r\n", fdt_base);
-    uart_send_string("[*] Kernel\r\n");
+    uart_printf("[*] Kernel\r\n");
 
     initramfs_init();
 

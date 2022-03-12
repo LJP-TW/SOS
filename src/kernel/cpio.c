@@ -55,7 +55,7 @@ void cpio_ls(char *cpio)
         // 070701
         if (*(uint32 *)&pheader->c_magic[0] != 0x37303730 &&
             *(uint16 *)&pheader->c_magic[4] != 0x3130) {
-            uart_send_string("[*] Only support new ASCII format of cpio.\r\n");
+            uart_printf("[*] Only support new ASCII format of cpio.\r\n");
             return;
         }
 
@@ -79,8 +79,7 @@ void cpio_ls(char *cpio)
             return;
         }
 
-        uart_send_string(filename);
-        uart_send_string("\r\n");
+        uart_printf("%s\r\n", filename);
     }
 }
 
@@ -95,7 +94,7 @@ void cpio_cat(char *cpio, char *filename)
         // 070701
         if (*(uint32 *)&pheader->c_magic[0] != 0x37303730 &&
             *(uint16 *)&pheader->c_magic[4] != 0x3130) {
-            uart_send_string("[*] Only support new ASCII format of cpio.\r\n");
+            uart_printf("[*] Only support new ASCII format of cpio.\r\n");
             return;
         }
 
@@ -117,13 +116,13 @@ void cpio_cat(char *cpio, char *filename)
         if (!strcmp(filename, curfilename)) {
             // Found it!
             uart_sendn(curcontent, filesize);
-            uart_send_string("\r\n");
+            uart_printf("\r\n");
             return;
         }
 
         // TRAILER!!!
         if (namesize == 0xb && !strcmp(curfilename, "TRAILER!!!")) {
-            uart_send_string("[*] File not found.\r\n");
+            uart_printf("[*] File not found.\r\n");
             return;
         }
     }
