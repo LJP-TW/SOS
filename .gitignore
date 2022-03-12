@@ -8,3 +8,4 @@ initramfs.cpio
 .gdbinit
 test/*
 pty.log
+mnt/*

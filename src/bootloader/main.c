@@ -30,8 +30,6 @@ static void load_kernel(void)
         *p++ = uart_recv();
     }
 
-    uart_printf("[*] Kernel loaded!\r\n");
-
     // Execute kernel
     ((kernel_funcp)_kernel)(fdt_base);
 }
@@ -75,7 +73,6 @@ static void cmd_loadkernel(void)
 
 static void cmd_reboot(void)
 {
-    uart_printf("Reboot!\r\n");
     BCM2837_reset(10);
 }
 
@@ -86,6 +83,9 @@ static int shell_read_cmd(void)
 
 static void shell(void)
 {
+    // One char maybe be received 
+    uart_recv();
+
     while (1) {
         int cmd_len;
         uart_printf("# ");

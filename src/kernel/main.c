@@ -46,7 +46,6 @@ static void cmd_hwinfo(void)
 
 static void cmd_reboot(void)
 {
-    uart_printf("Reboot!\r\n");
     BCM2837_reset(10);
 }
 
