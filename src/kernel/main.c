@@ -5,8 +5,6 @@
 #include <cpio.h>
 #include <fdt.h>
 
-#define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
-
 #define BUFSIZE 0x100
 
 uint64 _initramfs;

@@ -2,8 +2,6 @@
 #include <string.h>
 #include <mini_uart.h>
 
-#define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
-
 static void _print_tab(int level)
 {
     while (level--) {

@@ -13,4 +13,6 @@ typedef char int8;
 
 typedef uint32 size_t;
 
+#define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
+
 #endif /* _TYPES_H */

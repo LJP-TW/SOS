@@ -2,8 +2,6 @@
 #include <mini_uart.h>
 #include <string.h>
 
-#define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
-
 struct cpio_newc_header {
     char    c_magic[6];
     char    c_ino[8];
