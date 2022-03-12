@@ -4,6 +4,7 @@
 #include <rpi3.h>
 #include <cpio.h>
 #include <fdt.h>
+#include <mem.h>
 
 #define BUFSIZE 0x100
 
@@ -11,9 +12,19 @@ uint64 _initramfs;
 static char shell_buf[BUFSIZE];
 char *fdt_base;
 
+static void cmd_alloc(char *ssize)
+{
+    int size = atoi(ssize);
+    
+    char *p = simple_malloc(size);
+
+    uart_printf("[*] p: %x\r\n", p);
+}
+
 static void cmd_help(void)
 {
     uart_printf(
+                "alloc <size>\t: "   "test simple allocator" "\r\n"
                 "cat <filename>\t: " "get file content"  "\r\n"
                 "help\t: "   "print this help menu" "\r\n"
                 "hello\t: "  "print Hello World!"   "\r\n"
@@ -76,7 +87,11 @@ static void shell(void)
         uart_printf("# ");
         cmd_len = shell_read_cmd();
         uart_printf("\r\n");
-        if (!strcmp("help", shell_buf)) {
+        if (!strncmp("alloc", shell_buf, 5)) {
+            if (cmd_len >= 7) {
+                cmd_alloc(&shell_buf[6]);
+            }
+        } else if (!strcmp("help", shell_buf)) {
             cmd_help();
         } else if (!strcmp("hello", shell_buf)) {
             cmd_hello();
