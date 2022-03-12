@@ -31,3 +31,29 @@ int strlen(char *str)
 
     return ret;
 }
+
+int atoi(char *str)
+{
+    int i = 0, tmp = 0;
+
+    while (*str) {
+        if ('0' > *str || *str > '9') {
+            return 0;
+        }
+
+        i *= 10;
+
+        tmp = i + (*str - '0');
+
+        if (tmp < i) {
+            // Maybe overflow
+            return 0;
+        }
+
+        i = tmp;
+
+        str++;
+    }
+
+    return i;
+}
