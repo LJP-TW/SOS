@@ -20,3 +20,14 @@ int strncmp(char *str1, char *str2, int n)
 
     return n ? c1 - c2 : 0;
 }
+
+int strlen(char *str)
+{
+    int ret = 0;
+    
+    while (*str++) {
+        ret += 1;
+    }
+
+    return ret;
+}
