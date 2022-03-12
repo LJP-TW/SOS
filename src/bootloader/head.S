@@ -5,6 +5,9 @@
 
 .globl _start
 _start:
+  // Preserve flattened devicetree pointer
+  mov x19, x0
+
   // Check CPU id
   mrs x0, mpidr_el1
   and x0, x0, #0xff
@@ -28,6 +31,8 @@ _get_offset_ret:
   // Initialize stack
   ldr x0, =_stack_top
   mov sp, x0
+  // Pass flattened devicetree pointer
+  mov x0, x19
   bl start_bootloader
 
   // Should never return
@@ -56,11 +61,13 @@ relocate:
   sub x1, lr, x1
 
   // Get length
-  ldr x2, =_kernel
+  ldr x2, =_bootloader
   ldr x3, =_edata
   sub x2, x3, x2
   bl memncpy
 
-  ldr x0, =_bootloader
-  br x0
+  // Pass flattened devicetree pointer
+  mov x0, x19
+  ldr x1, =_bootloader
+  br x1
   // No return

@@ -7,8 +7,9 @@
 
 extern char _kernel[];
 char shell_buf[BUFSIZE];
+char *fdt_base;
 
-typedef void (*funcp)(void);
+typedef void (*kernel_funcp)(char *fdt);
 
 static void load_kernel(void)
 {
@@ -36,7 +37,7 @@ static void load_kernel(void)
     uart_send_string("[*] Kernel loaded!\r\n");
 
     // Execute kernel
-    ((funcp)_kernel)();
+    ((kernel_funcp)_kernel)(fdt_base);
 }
 
 static void cmd_help(void)
@@ -118,8 +119,10 @@ static void shell(void)
     }
 }
 
-void start_bootloader(void)
+void start_bootloader(char *fdt)
 {
+    fdt_base = fdt;
+
     uart_init();
     uart_send_string("[*] Bootloader\r\n");
 

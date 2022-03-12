@@ -3,11 +3,15 @@
 #include <BCM2837.h>
 #include <rpi3.h>
 #include <cpio.h>
+#include <fdt.h>
+
+#define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
 
 #define BUFSIZE 0x100
 
-extern char _initramfs[];
+uint64 _initramfs;
 static char shell_buf[BUFSIZE];
+char *fdt_base;
 
 static void cmd_help(void)
 {
@@ -17,6 +21,7 @@ static void cmd_help(void)
                 "hello\t: "  "print Hello World!"   "\r\n"
                 "hwinfo\t: " "print hardware info"  "\r\n"
                 "ls\t: " "list files in initramfs"  "\r\n"
+                "parsedtb\t: " "parse devicetree blob (dtb)"  "\r\n"
                 "reboot\t: " "reboot the device"    "\r\n"
             );
 }
@@ -63,6 +68,11 @@ static void cmd_cat(char *filename)
     cpio_cat(_initramfs, filename);
 }
 
+static void cmd_parsedtb(void)
+{
+    fdt_traversal(fdt_base);
+}
+
 static int shell_read_cmd(void)
 {
     return uart_recvline(shell_buf, BUFSIZE);
@@ -85,6 +95,8 @@ static void shell(void)
             cmd_reboot();
         } else if (!strcmp("ls", shell_buf)) {
             cmd_ls();
+        } else if (!strcmp("parsedtb", shell_buf)) {
+            cmd_parsedtb();
         } else if (!strncmp("cat", shell_buf, 3)) {
             if (cmd_len >= 5) {
                 cmd_cat(&shell_buf[4]);
@@ -97,10 +109,51 @@ static void shell(void)
     }
 }
 
-void start_kernel(void)
+static int initramfs_fdt_parser(int level, char *cur, char *dt_strings)
 {
+    struct fdt_node_header *nodehdr = cur;
+    struct fdt_property *prop;
+
+    uint32 tag = fdtn_tag(nodehdr);
+
+    switch (tag) {
+    case FDT_PROP:
+        prop = nodehdr;
+        if (!strcmp("linux,initrd-start", dt_strings + fdtp_nameoff(prop))) {
+            _initramfs = fdt32_ld(&prop->data);
+            uart_printf("[*] initrd addr: %x\r\n", _initramfs);
+            return 1;
+        }
+        break;
+    case FDT_BEGIN_NODE:
+    case FDT_END_NODE:
+    case FDT_NOP:
+    case FDT_END:
+        break;
+    }
+
+    return 0;
+}
+
+static void initramfs_init()
+{
+    // Get initramfs address from devicetree
+    _initramfs = 0;
+    parse_dtb(fdt_base, initramfs_fdt_parser);
+    if (!_initramfs) {
+        uart_printf("[x] Cannot find initrd address!!!\r\n");
+    }
+}
+
+void start_kernel(char *fdt)
+{
+    fdt_base = fdt;
+
     uart_init();
+    uart_printf("[*] fdt base: %x\r\n", fdt_base);
     uart_send_string("[*] Kernel\r\n");
+
+    initramfs_init();
 
     shell();
 }

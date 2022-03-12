@@ -23,6 +23,8 @@ KERNEL_ELF := $(BUILD_DIR)/kernel8.elf
 IMG_NAME   := $(BUILD_DIR)/myos.img
 INITRAMFS_CPIO := $(BUILD_DIR)/initramfs.cpio
 
+RPI3_DTB   := $(IMG_DIR)/bcm2710-rpi-3-b-plus.dtb
+
 IMG_FILES             = $(wildcard $(IMG_DIR)/*)
 INITRAMFS_FILES       = $(wildcard $(INITRAMFS_DIR)/*)
 BOOTLOADER_C_FILES    = $(wildcard $(SRC_DIR)/$(BOOTLOADER_DIR)/*.c)
@@ -79,10 +81,12 @@ $(BUILD_DIR)/$(LIB_DIR)/%_c.o: $(SRC_DIR)/$(LIB_DIR)/%.c
 $(INITRAMFS_CPIO): $(INITRAMFS_FILES)
 	cd initramfs; find . | cpio -o -H newc > ../$(INITRAMFS_CPIO)
 
-qemu: $(KERNEL_IMG) $(INITRAMFS_CPIO)
-	qemu-system-aarch64 -M raspi3 -kernel $(KERNEL_IMG) -display none \
+qemu: all $(INITRAMFS_CPIO) $(RPI3_DTB)
+	qemu-system-aarch64 -M raspi3 -kernel $(BOOTLOADER_IMG) -display none \
 						-initrd $(INITRAMFS_CPIO) \
-					    -serial null -serial pty -s -S
+						-dtb $(RPI3_DTB) \
+						-chardev pty,id=pty0,logfile=pty.log,signal=off \
+					    -serial null -serial chardev:pty0 -s -S
 
 image: $(BOOTLOADER_IMG) $(IMG_NAME) $(INITRAMFS_CPIO) $(IMG_FILES)
 	./tools/buildimg.sh $^

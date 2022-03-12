@@ -4,7 +4,7 @@ _stack_top  = 0x400000;
 
 SECTIONS
 {
-  . = _kernel;
+  . = _bootloader;
   
   .text.boot : {
     *(.text.boot)

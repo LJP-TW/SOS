@@ -5,6 +5,9 @@
 
 .globl _start
 _start:
+  // Preserve flattened devicetree pointer
+  mov x19, x0
+
   // Initialize bss
   ldr x0, =_sbss
   ldr x1, =_ebss
@@ -14,6 +17,8 @@ _start:
   // Initialize stack
   ldr x0, =_stack_top
   mov sp, x0
+  // Pass flattened devicetree pointer
+  mov x0, x19
   bl start_kernel
 
   // Should never return
