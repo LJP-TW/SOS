@@ -5,6 +5,7 @@
 #include <cpio.h>
 #include <fdt.h>
 #include <mem.h>
+#include <exec.h>
 
 #define BUFSIZE 0x100
 
@@ -26,6 +27,7 @@ static void cmd_help(void)
     uart_printf(
                 "alloc <size>\t: "   "test simple allocator" "\r\n"
                 "cat <filename>\t: " "get file content"  "\r\n"
+                "exec <filename>\t: " "execute file"  "\r\n"
                 "help\t: "   "print this help menu" "\r\n"
                 "hello\t: "  "print Hello World!"   "\r\n"
                 "hwinfo\t: " "print hardware info"  "\r\n"
@@ -70,6 +72,23 @@ static void cmd_cat(char *filename)
     cpio_cat(_initramfs, filename);
 }
 
+static void cmd_exec(char *filename)
+{
+    char *mem;
+    char *user_sp;
+
+    mem = cpio_load_prog(_initramfs, filename);
+
+    if (mem == NULL) {
+        return;
+    }
+
+    // TODO: Set stack of user program properly
+    user_sp = (char *)0x10000000;
+
+    exec_user_prog(mem, user_sp);
+}
+
 static void cmd_parsedtb(void)
 {
     fdt_traversal(fdt_base);
@@ -106,6 +125,10 @@ static void shell(void)
         } else if (!strncmp("cat", shell_buf, 3)) {
             if (cmd_len >= 5) {
                 cmd_cat(&shell_buf[4]);
+            }
+        } else if (!strncmp("exec", shell_buf, 4)) {
+            if (cmd_len >= 6) {
+                cmd_exec(&shell_buf[5]);
             }
         } else {
             // Just echo back
