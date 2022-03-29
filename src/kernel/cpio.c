@@ -49,7 +49,7 @@ void cpio_ls(char *cpio)
     char *cur = cpio;
 
     while (1) {        
-        struct cpio_newc_header *pheader = cur;
+        struct cpio_newc_header *pheader = (struct cpio_newc_header *)cur;
         cur += sizeof(struct cpio_newc_header);
 
         // 070701
@@ -88,7 +88,7 @@ void cpio_cat(char *cpio, char *filename)
     char *cur = cpio;
 
     while (1) {        
-        struct cpio_newc_header *pheader = cur;
+        struct cpio_newc_header *pheader = (struct cpio_newc_header *)cur;
         cur += sizeof(struct cpio_newc_header);
 
         // 070701
@@ -133,7 +133,7 @@ char *cpio_load_prog(char *cpio, char *filename)
     char *cur = cpio;
 
     while (1) {        
-        struct cpio_newc_header *pheader = cur;
+        struct cpio_newc_header *pheader = (struct cpio_newc_header *)cur;
         cur += sizeof(struct cpio_newc_header);
 
         // 070701

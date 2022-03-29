@@ -17,4 +17,6 @@ typedef uint32 size_t;
 
 #define NULL (void *)0
 
+#define TO_CHAR_PTR(a) ((char *)(uint64)(a))
+
 #endif /* _TYPES_H */

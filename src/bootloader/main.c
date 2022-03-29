@@ -87,9 +87,8 @@ static void shell(void)
     uart_recv();
 
     while (1) {
-        int cmd_len;
         uart_printf("# ");
-        cmd_len = shell_read_cmd();
+        shell_read_cmd();
         uart_printf("\r\n");
         if (!strcmp("help", shell_buf)) {
             cmd_help();

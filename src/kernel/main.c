@@ -9,7 +9,7 @@
 
 #define BUFSIZE 0x100
 
-uint64 _initramfs;
+char *_initramfs;
 static char shell_buf[BUFSIZE];
 char *fdt_base;
 
@@ -139,16 +139,16 @@ static void shell(void)
 
 static int initramfs_fdt_parser(int level, char *cur, char *dt_strings)
 {
-    struct fdt_node_header *nodehdr = cur;
+    struct fdt_node_header *nodehdr = (struct fdt_node_header *)cur;
     struct fdt_property *prop;
 
     uint32 tag = fdtn_tag(nodehdr);
 
     switch (tag) {
     case FDT_PROP:
-        prop = nodehdr;
+        prop = (struct fdt_property *)nodehdr;
         if (!strcmp("linux,initrd-start", dt_strings + fdtp_nameoff(prop))) {
-            _initramfs = fdt32_ld(&prop->data);
+            _initramfs = TO_CHAR_PTR(fdt32_ld((fdt32_t *)&prop->data));
             uart_printf("[*] initrd addr: %x\r\n", _initramfs);
             return 1;
         }
@@ -166,7 +166,7 @@ static int initramfs_fdt_parser(int level, char *cur, char *dt_strings)
 static void initramfs_init()
 {
     // Get initramfs address from devicetree
-    _initramfs = 0;
+    _initramfs = NULL;
     parse_dtb(fdt_base, initramfs_fdt_parser);
     if (!_initramfs) {
         uart_printf("[x] Cannot find initrd address!!!\r\n");

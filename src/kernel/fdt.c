@@ -23,7 +23,7 @@ static void _dump(char *start, int len)
 
 static int fdt_traversal_parser(int level, char *cur, char *dt_strings)
 {
-    struct fdt_node_header *nodehdr = cur;
+    struct fdt_node_header *nodehdr = (struct fdt_node_header *)cur;
     struct fdt_property *prop;
 
     uint32 tag = fdtn_tag(nodehdr);
@@ -38,7 +38,7 @@ static int fdt_traversal_parser(int level, char *cur, char *dt_strings)
         uart_printf("[*] Node end\r\n");
         break;
     case FDT_PROP:
-        prop = nodehdr;
+        prop = (struct fdt_property *)nodehdr;
         _print_tab(level);
         uart_printf("[*] %s:", dt_strings + fdtp_nameoff(prop));
         _dump(prop->data, fdtp_len(prop));
@@ -62,8 +62,8 @@ static void parse_dt_struct(
     int level = 0;
 
     while (1) {
-        cur = ALIGN((uint64)cur, 4);
-        struct fdt_node_header *nodehdr = cur;
+        cur = (char *)ALIGN((uint64)cur, 4);
+        struct fdt_node_header *nodehdr = (struct fdt_node_header *)cur;
         struct fdt_property *prop;
 
         uint32 tag = fdtn_tag(nodehdr);
@@ -87,7 +87,7 @@ static void parse_dt_struct(
             cur += sizeof(struct fdt_node_header);
             break;
         case FDT_PROP:
-            prop = nodehdr;
+            prop = (struct fdt_property *)nodehdr;
             if (parser(level, cur, dt_strings)) {
                 return;
             }
@@ -109,7 +109,7 @@ static void parse_dt_struct(
 
 void parse_dtb(char *dtb, fdt_parser parser)
 {
-    struct fdt_header *hdr = dtb;
+    struct fdt_header *hdr = (struct fdt_header *)dtb;
 
     if (fdt_magic(hdr) != FDT_MAGIC) {
         uart_printf("[x] Not valid fdt_header\r\n");
