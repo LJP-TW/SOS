@@ -15,4 +15,6 @@ typedef uint32 size_t;
 
 #define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
 
+#define NULL (void *)0
+
 #endif /* _TYPES_H */
