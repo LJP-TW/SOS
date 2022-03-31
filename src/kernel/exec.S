@@ -8,9 +8,9 @@ exec_user_prog:
     // Set user stack
     msr sp_el0, x1
 
-    // Disable interrupt ({D, A, I, F} = 1 (masked))
+    // Enable interrupt ({D, A, I, F} = 0 (unmasked))
     // EL0 ({M[3:0]} = 0)
-    mov x0, 0x3c0
+    mov x0, 0
     msr spsr_el1, x0
     
     // return to EL0

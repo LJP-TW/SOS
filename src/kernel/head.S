@@ -12,6 +12,8 @@ _start:
   // the next instruction runs in EL1
 
   bl set_exception_vector_table
+  
+  bl enable_core0_timer
 
   // Initialize bss
   ldr x0, =_sbss
@@ -90,8 +92,12 @@ set_exception_vector_table:
 .endm
 
 exception_handler:
-  save_all
   // Do nothing
+  save_all
+
+  mov x0, 0
+  bl exception_default_handler
+
   load_all
   eret
 
@@ -112,73 +118,116 @@ l64_syn_eh_end:
   load_all
   eret
 
+l64_irq_eh:
+  save_all
+
+  bl irq_handler
+
+  load_all
+  eret
+
+curr_syn_eh:
+  save_all
+
+  mov x0, 1
+  bl exception_default_handler
+
+  load_all
+  eret
+
+curr_irq_eh:
+  save_all
+
+  bl irq_handler
+
+  load_all
+  eret
+
+curr_fiq_eh:
+  save_all
+
+  mov x0, 2
+  bl exception_default_handler
+
+  load_all
+  eret
+
+curr_se_eh:
+  save_all
+
+  mov x0, 3
+  bl exception_default_handler
+
+  load_all
+  eret
+
 .align 11 // vector table should be aligned to 0x800
 .global exception_vector_table
 exception_vector_table:
   // Exception from the current EL while using SP_EL0
   // Synchronous
-  bl exception_handler
+  b exception_handler
   .align 7
   
   // IRQ
-  bl exception_handler
+  b exception_handler
   .align 7
 
   // FIQ
-  bl exception_handler
+  b exception_handler
   .align 7
 
   // SError
-  bl exception_handler
+  b exception_handler
   .align 7
 
   // Exception from the current EL while using SP_ELx
   // Synchronous
-  bl exception_handler
+  b curr_syn_eh
   .align 7
 
   // IRQ
-  bl exception_handler
+  b curr_irq_eh
   .align 7
 
   // FIQ
-  bl exception_handler
+  b curr_fiq_eh
   .align 7
 
   // SError
-  bl exception_handler
+  b curr_se_eh
   .align 7
 
   // Exception from a lower EL and at least one lower EL is AArch64
   // Synchronous
-  bl l64_syn_eh
+  b l64_syn_eh
   .align 7
   
   // IRQ
-  bl exception_handler
+  b l64_irq_eh
   .align 7
 
   // FIQ
-  bl exception_handler
+  b exception_handler
   .align 7
 
   // SError
-  bl exception_handler
+  b exception_handler
   .align 7
 
   // Exception from a lower EL and all lower ELs are AArch32
   // Synchronous
-  bl exception_handler
+  b exception_handler
   .align 7
 
   // IRQ
-  bl exception_handler
+  b exception_handler
   .align 7
 
   // FIQ
-  bl exception_handler
+  b exception_handler
   .align 7
 
   // SError
-  bl exception_handler
+  b exception_handler
   .align 7
