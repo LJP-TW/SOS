@@ -1,5 +1,6 @@
 #include <mini_uart.h>
 #include <syscall.h>
+#include <utils.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 
@@ -7,13 +8,6 @@ typedef void *(*funcp)();
 
 void *syscall_test();
 void *syscall_exit();
-
-// Reference from https://elixir.bootlin.com/linux/latest/source/tools/lib/perf/mmap.c#L299
-#define read_sysreg(r) ({                       \
-    uint64 __val;                               \
-    asm volatile("mrs %0, " #r : "=r" (__val)); \
-    __val;                                      \
-})
 
 funcp syscall_table[] = {
     syscall_test, // 0
