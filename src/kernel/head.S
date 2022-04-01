@@ -70,6 +70,14 @@ set_exception_vector_table:
   str x30, [sp, 16 * 15]
 .endm
 
+// save exception registers to stack
+.macro save_exception_reg
+  sub sp, sp, 2 * 8
+  mrs x0, elr_el1
+  mrs x1, spsr_el1
+  stp x0, x1, [sp, 0]
+.endm
+
 // load general registers from stack
 .macro load_all
   ldp x0, x1, [sp ,16 * 0]
@@ -91,6 +99,14 @@ set_exception_vector_table:
   add sp, sp, 32 * 8
 .endm
 
+// load exception registers from stack
+.macro load_exception_reg
+  ldp x0, x1, [sp, 0]
+  msr elr_el1, x0
+  msr spsr_el1, x1
+  add sp, sp, 2 * 8
+.endm
+
 exception_handler:
   // Do nothing
   save_all
@@ -103,6 +119,7 @@ exception_handler:
 
 l64_syn_eh:
   save_all
+  save_exception_reg
 
   // Get exception class ({EC[31:26]})
   mrs x0, esr_el1
@@ -115,14 +132,17 @@ l64_syn_eh:
   bl syscall_handler
 
 l64_syn_eh_end:
+  load_exception_reg
   load_all
   eret
 
 l64_irq_eh:
   save_all
+  save_exception_reg
 
   bl irq_handler
 
+  load_exception_reg
   load_all
   eret
 
@@ -137,9 +157,11 @@ curr_syn_eh:
 
 curr_irq_eh:
   save_all
+  save_exception_reg
 
   bl irq_handler
 
+  load_exception_reg
   load_all
   eret
 

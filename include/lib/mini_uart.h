@@ -11,4 +11,9 @@ void uart_send(char c);
 void uart_sendn(char *str, int n);
 void uart_printf(char *fmt, ...);
 
+void uart_irq_handler(void);
+
+/* Switch asynchronous/synchronous mode for uart RW */
+int uart_switch_mode(void);
+
 #endif  /* _MINI_UART_H */

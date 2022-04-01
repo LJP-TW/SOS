@@ -6,12 +6,82 @@
 
 #define SIGN        1
 
+#define BUFSIZE 0x100
+
+// UART asynchronous/synchronous mode
+// 0: Synchronous mode
+// 1: Asynchronous mode
+static int uart_sync_mode;
+
+// UART read / write function pointer
+typedef char (*recvfp)(void);
+typedef void (*sendfp)(char);
+
+recvfp uart_recv_fp;
+sendfp uart_send_fp;
+
+// Data structure for async RW
+static char r_ringbuf[BUFSIZE];
+static char w_ringbuf[BUFSIZE];
+static int r_head, r_tail;
+static int w_head, w_tail;
+
+static char uart_asyn_recv(void)
+{
+    while (r_head == r_tail) {}
+
+    char tmp = r_ringbuf[r_head];
+    r_head = (r_head + 1) % BUFSIZE;
+
+    return tmp;
+}
+
+static void uart_asyn_send(char c)
+{
+    while (w_head == (w_tail + 1) % BUFSIZE) {
+    }
+
+    w_ringbuf[w_tail] = c;
+    w_tail = (w_tail + 1) % BUFSIZE;
+
+    // Enable transmit interrupt
+    uint32 ier = get32(AUX_MU_IER_REG);
+    ier = ier | 0x02;
+    put32(AUX_MU_IER_REG, ier);
+
+    enable_interrupt();
+}
+
+static char uart_sync_recv(void)
+{
+    while (!(get32(AUX_MU_LSR_REG) & 0x01)) {};
+
+    return (get32(AUX_MU_IO_REG) & 0xFF);
+}
+
+static void uart_sync_send(char c)
+{
+    while (!(get32(AUX_MU_LSR_REG) & 0x20)) {};
+
+    put32(AUX_MU_IO_REG, c);
+}
+
+char uart_recv(void)
+{
+    return (uart_recv_fp)();
+}
+
+void uart_send(char c)
+{
+    (uart_send_fp)(c);
+}
+
 uint32 uart_recv_uint(void)
 {
     char buf[4];
     
     for (int i = 0; i < 4; ++i) {
-        buf[i] = uart_recv();
+        buf[i] = (uart_recv_fp)();
     }
 
     return *((uint32*)buf);
@@ -25,14 +95,14 @@ uint32 uart_recvline(char *buff, int maxlen)
     maxlen--;
 
     while (maxlen) {
-        char c = uart_recv();
+        char c = (uart_recv_fp)();
 
         if (c == '\r') {
             // TODO: what if c == '\0'?
             break;
         }
 
-        uart_send(c);
+        (uart_send_fp)(c);
         *buff = c;
         buff++;
         cnt += 1;
@@ -44,31 +114,17 @@ uint32 uart_recvline(char *buff, int maxlen)
     return cnt;
 }
 
-void uart_send(char c)
-{
-    while (!(get32(AUX_MU_LSR_REG) & 0x20)) {};
-
-    put32(AUX_MU_IO_REG, c);
-}
-
 void uart_sendn(char *str, int n)
 {
     while (n--) {
-        uart_send(*str++);
+        (uart_send_fp)(*str++);
     }
-}
-
-char uart_recv(void)
-{
-    while (!(get32(AUX_MU_LSR_REG) & 0x01)) {};
-
-    return (get32(AUX_MU_IO_REG) & 0xFF);
 }
 
 static void uart_send_string(const char *str)
 {
     for (int i = 0; str[i] != '\0'; i++) {
-        uart_send(str[i]);
+        (uart_send_fp)(str[i]);
     }
 }
 
@@ -85,7 +141,7 @@ static void uart_send_num(int64 num, int base, int type)
 
     if (type | SIGN) {
         if (num < 0) {
-            uart_send('-');
+            (uart_send_fp)('-');
         }
     }
 
@@ -102,7 +158,7 @@ static void uart_send_num(int64 num, int base, int type)
     }
 
     while (--i >= 0) {
-        uart_send(tmp[i]);
+        (uart_send_fp)(tmp[i]);
     }
 }
 
@@ -119,7 +175,7 @@ void uart_printf(char *fmt, ...)
 
     for (; *fmt; ++fmt) {
         if (*fmt != '%') {
-            uart_send(*fmt);
+            (uart_send_fp)(*fmt);
             continue;
         }
 
@@ -135,7 +191,7 @@ void uart_printf(char *fmt, ...)
         switch (*fmt) {
         case 'c':
             c = va_arg(args, uint32) & 0xff;
-            uart_send(c);
+            (uart_send_fp)(c);
             continue;
         case 'd':
             if (width) {
@@ -186,4 +242,70 @@ void uart_init(void)
     put32(AUX_MU_BAUD_REG, 270);       // Set baud rate to 115200
     put32(AUX_MU_IIR_REG, 6);          // Clear the Rx/Tx FIFO
     put32(AUX_MU_CNTL_REG, 3);         // Finally, enable transmitter and receiver
+
+    // UART start from synchronous mode
+    uart_sync_mode = 0;
+    uart_recv_fp = uart_sync_recv;
+    uart_send_fp = uart_sync_send;
+}
+
+void uart_irq_handler(void)
+{
+    uint32 iir = get32(AUX_MU_IIR_REG);
+
+    if (iir & 0x01) {
+        // No interrupt
+        return;
+    }
+
+    if (iir & 0x02) {
+        // Transmit holding register empty
+        if (w_head == w_tail) {
+            // Transmit complete
+            // Disable interrupt
+            uint32 ier = get32(AUX_MU_IER_REG);
+
+            ier = ier & ~(0x02);
+
+            put32(AUX_MU_IER_REG, ier);
+        } else {
+            put32(AUX_MU_IO_REG, w_ringbuf[w_head]);
+            w_head = (w_head + 1) % BUFSIZE;
+        }
+    } else if (iir & 0x04) {
+        // Receiver holds valid byte
+        if (r_head != (r_tail + 1) % BUFSIZE) {
+            r_ringbuf[r_tail] = get32(AUX_MU_IO_REG) & 0xFF;
+            r_tail = (r_tail + 1) % BUFSIZE;
+        }
+    }
+}
+
+int uart_switch_mode(void)
+{
+    uart_sync_mode = !uart_sync_mode;
+    uint32 ier = get32(AUX_MU_IER_REG);
+    ier = ier & ~(0x03);
+
+    if (uart_sync_mode == 0) {
+        // Synchronous mode
+        uart_recv_fp = uart_sync_recv;
+        uart_send_fp = uart_sync_send;
+
+        // Disable interrupt
+        put32(AUX_MU_IER_REG, ier);
+    } else {
+        // Asynchronous mode
+        uart_recv_fp = uart_asyn_recv;
+        uart_send_fp = uart_asyn_send;
+
+        // Clear the Rx/Tx FIFO
+        put32(AUX_MU_IIR_REG, 6);
+
+        // Enable receive interrupt
+        ier = ier | 0x01;
+        put32(AUX_MU_IER_REG, ier);
+    }
+
+    return uart_sync_mode;
 }

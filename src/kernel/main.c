@@ -8,6 +8,7 @@
 #include <exec.h>
 #include <utils.h>
 #include <timer.h>
+#include <irq.h>
 
 #define BUFSIZE 0x100
 
@@ -37,6 +38,7 @@ static void cmd_help(void)
                 "parsedtb\t: " "parse devicetree blob (dtb)"  "\r\n"
                 "reboot\t: " "reboot the device"    "\r\n"
                 "sw_timer\t: " "turn on/off timer debug info" "\r\n"
+                "sw_uart_mode\t: " "use sync/async UART" "\r\n"
             );
 }
 
@@ -68,6 +70,17 @@ static void cmd_reboot(void)
 static void cmd_sw_timer(void)
 {
     timer_switch_info();
+}
+
+static void cmd_sw_uart_mode(void)
+{
+    int mode = uart_switch_mode();
+
+    if (mode == 0) {
+        uart_printf("[*] Use synchronous UART\r\n");
+    } else {
+        uart_printf("[*] Use asynchronous UART\r\n");
+    }
 }
 
 static void cmd_ls(void)
@@ -128,6 +141,8 @@ static void shell(void)
             cmd_reboot();
         } else if (!strcmp("sw_timer", shell_buf)) {
             cmd_sw_timer();
+        } else if (!strcmp("sw_uart_mode", shell_buf)) {
+            cmd_sw_uart_mode();
         } else if (!strcmp("ls", shell_buf)) {
             cmd_ls();
         } else if (!strcmp("parsedtb", shell_buf)) {
@@ -194,6 +209,9 @@ void start_kernel(char *fdt)
     uart_printf("[*] Kernel\r\n");
 
     initramfs_init();
+
+    // Enable interrupt from Auxiliary peripherals
+    irq1_enable(29);
 
     enable_interrupt();
 
