@@ -9,6 +9,7 @@
 #include <utils.h>
 #include <timer.h>
 #include <irq.h>
+#include <mm.h>
 
 #define BUFSIZE 0x100
 
@@ -37,6 +38,8 @@ static void cmd_help(void)
                 "ls\t: " "list files in initramfs"  "\r\n"
                 "parsedtb\t: " "parse devicetree blob (dtb)"  "\r\n"
                 "reboot\t: " "reboot the device"    "\r\n"
+                "setTimeout <msg> <sec>\t: " 
+                    "print @msg after @sec seconds" "\r\n"
                 "sw_timer\t: " "turn on/off timer debug info" "\r\n"
                 "sw_uart_mode\t: " "use sync/async UART" "\r\n"
             );
@@ -65,6 +68,18 @@ static void cmd_hwinfo(void)
 static void cmd_reboot(void)
 {
     BCM2837_reset(10);
+}
+
+static void cmd_setTimeout(char *msg, char *ssec)
+{
+    int len;
+    char *m;
+
+    len = strlen(msg) + 1;
+    m = simple_malloc(len);
+    memncpy(m, msg, len);
+
+    timer_add_proc((void (*)(void *))uart_printf, m, atoi(ssec));
 }
 
 static void cmd_sw_timer(void)
@@ -139,6 +154,42 @@ static void shell(void)
             cmd_hwinfo();
         } else if (!strcmp("reboot", shell_buf)) {
             cmd_reboot();
+        } else if (!strncmp("setTimeout", shell_buf, 10)) {
+            char *msg, *ssec;
+            
+            msg = shell_buf + 10;
+
+            if (*msg != ' ') {
+                continue;
+            }
+
+            msg++;
+
+            if (!*msg) {
+                continue;
+            }
+
+            ssec = msg;
+
+            while (*(++ssec)) {
+                if (*ssec == ' ') {
+                    break;
+                }
+            }
+
+            if (*ssec != ' ') {
+                continue;
+            }
+
+            *ssec = 0;
+
+            ssec++;
+
+            if (!*ssec) {
+                continue;
+            }
+
+            cmd_setTimeout(msg, ssec);
         } else if (!strcmp("sw_timer", shell_buf)) {
             cmd_sw_timer();
         } else if (!strcmp("sw_uart_mode", shell_buf)) {
@@ -200,14 +251,13 @@ static void initramfs_init()
 
 void start_kernel(char *fdt)
 {
-    timer_init();
-
     fdt_base = fdt;
 
     uart_init();
     uart_printf("[*] fdt base: %x\r\n", fdt_base);
     uart_printf("[*] Kernel\r\n");
 
+    timer_init();
     initramfs_init();
 
     // Enable interrupt from Auxiliary peripherals

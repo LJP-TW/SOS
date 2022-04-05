@@ -29,4 +29,7 @@ uint32 get32(uint64 addr);
     asm volatile("msr DAIFSet, 0xf"); \
 } while (0)
 
+#define get_elem_idx(elem, array) \
+    (((char *)elem - (char *)array) / sizeof(array[0]))
+
 #endif  /* _UTILS_H */
