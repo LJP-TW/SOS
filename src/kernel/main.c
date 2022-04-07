@@ -253,6 +253,8 @@ void start_kernel(char *fdt)
 {
     fdt_base = fdt;
 
+    irq_init();
+
     uart_init();
     uart_printf("[*] fdt base: %x\r\n", fdt_base);
     uart_printf("[*] Kernel\r\n");

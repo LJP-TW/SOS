@@ -3,6 +3,7 @@
 #include <mini_uart.h>
 #include <list.h>
 #include <bitops.h>
+#include <irq.h>
 
 #define CORE0_TIMER_IRQ_CTRL 0x40000040
 #define CORE0_IRQ_SOURCE 0x40000060
@@ -157,12 +158,9 @@ static void timer_set()
     disable_interrupt();
 
     if (!t_meta.size) {
-        timer_disable();
         write_sysreg(DAIF, daif);
         return;
     }
-
-    timer_enable();
     
     tp = list_first_entry(&t_meta.head, timer_proc, list);
 
@@ -203,32 +201,38 @@ void timer_init()
     timer_add_proc(timer_show_boot_time, NULL, 2);
 }
 
-void timer_irq_handler()
+void timer_irq_check()
 {
     uint32 core0_irq_src = get32(CORE0_IRQ_SOURCE);
 
     if (core0_irq_src & 0x02) {
-        timer_proc *tp;
-
-        if (!t_meta.size) {
-            return;
-        }
-
-        // Set next timer before calling any functions which may interrupt
-        tp = list_first_entry(&t_meta.head, timer_proc, list);
-
-        list_del(&tp->list);
-        t_meta.size -= 1;
-
-        timer_update_remain_time();
-        timer_set();
-
-        // Execute the callback function
-        enable_interrupt();
-        (tp->cb)(tp->args);
-        disable_interrupt();
-        tp_release(tp);
+        timer_disable();
+        irq_add_tasks(timer_irq_handler, NULL, 0);
     }
+}
+
+void timer_irq_handler()
+{
+    timer_proc *tp;
+
+    if (!t_meta.size) {
+        return;
+    }
+
+    // Set next timer before calling any functions which may interrupt
+    tp = list_first_entry(&t_meta.head, timer_proc, list);
+
+    list_del(&tp->list);
+    t_meta.size -= 1;
+
+    timer_update_remain_time();
+    timer_set();
+
+    // Execute the callback function
+    (tp->cb)(tp->args);
+    tp_release(tp);
+
+    timer_enable();
 }
 
 void timer_switch_info()
@@ -257,5 +261,6 @@ void timer_add_proc(void (*proc)(void *), void *args, uint32 after)
     
     if (need_update) {
         timer_set();
+        timer_enable();
     }
 }

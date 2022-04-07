@@ -4,6 +4,7 @@
 #include <types.h>
 
 void timer_init();
+void timer_irq_check();
 void timer_irq_handler();
 void timer_switch_info();
 
