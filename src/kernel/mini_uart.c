@@ -272,7 +272,9 @@ void uart_irq_check(void)
 
     // Disable RW interrupt
     put32(AUX_MU_IER_REG, 0);
-    irq_add_tasks((void (*)(void *))uart_irq_handler, NULL, 1);
+    if (irq_add_tasks((void (*)(void *))uart_irq_handler, NULL, 1)) {
+        put32(AUX_MU_IER_REG, 0x03);
+    }
 }
 
 void uart_irq_handler(void)

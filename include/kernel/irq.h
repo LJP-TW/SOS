@@ -4,7 +4,11 @@
 #include <types.h>
 
 void irq_init();
-void irq_add_tasks(void (*task)(void *), void *args, uint32 prio);
+
+/*
+ * On success, 0 is returned
+ */
+int irq_add_tasks(void (*task)(void *), void *args, uint32 prio);
 
 void irq_handler();
 void exception_default_handler(uint32 n);

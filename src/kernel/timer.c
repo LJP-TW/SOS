@@ -207,7 +207,9 @@ void timer_irq_check()
 
     if (core0_irq_src & 0x02) {
         timer_disable();
-        irq_add_tasks(timer_irq_handler, NULL, 0);
+        if (irq_add_tasks(timer_irq_handler, NULL, 0)) {
+            timer_enable();
+        }
     }
 }
 

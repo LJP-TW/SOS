@@ -96,13 +96,9 @@ static void it_remove(irq_task *it)
  */
 static int it_insert(irq_task *it)
 {
-    uint64 daif;
     irq_task *iter;
     int preempt;
     int inserted;
-
-    daif = read_sysreg(DAIF);
-    disable_interrupt();
 
     // Insert irq_task
     preempt = 1;
@@ -125,8 +121,6 @@ static int it_insert(irq_task *it)
     if (!inserted) {
         list_add_tail(&it->np_list, &irq_tasks_meta);
     }
-
-    write_sysreg(DAIF, daif);
 
     return preempt;
 }
@@ -181,7 +175,7 @@ void irq_init()
 /*
  * Interrupts must be disabled before calling this function.
  */
-void irq_add_tasks(void (*task)(void *), void *args, uint32 prio)
+int irq_add_tasks(void (*task)(void *), void *args, uint32 prio)
 {
     irq_task *it;
     int preempt;
@@ -189,7 +183,7 @@ void irq_add_tasks(void (*task)(void *), void *args, uint32 prio)
     it = it_alloc();
 
     if (!it) {
-        return;
+        return -1;
     }
 
     it->cb = task;
@@ -213,6 +207,8 @@ void irq_add_tasks(void (*task)(void *), void *args, uint32 prio)
     }
 
     it_run();
+
+    return 0;
 }
 
 void irq_handler()
