@@ -32,7 +32,9 @@ void syscall_handler(uint32 syn)
     }
 
     // TODO: bring the arguments to syscall
+    enable_interrupt();
     (syscall_table[syscall_num])();
+    disable_interrupt();
 }
 
 // Print the content of spsr_el1, elr_el1 and esr_el1

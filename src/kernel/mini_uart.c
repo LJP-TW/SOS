@@ -59,9 +59,6 @@ static void uart_asyn_send(char c)
     ier = get32(AUX_MU_IER_REG);
     ier = ier | 0x02;
     put32(AUX_MU_IER_REG, ier);
-
-    // TODO: Maybe this can be removed?
-    enable_interrupt();
 }
 
 static char uart_sync_recv(void)
