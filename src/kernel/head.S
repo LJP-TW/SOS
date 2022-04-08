@@ -5,12 +5,8 @@
 
 .globl _start
 _start:
-  // Check CPU id
-  mrs x0, mpidr_el1
-  and x0, x0, #0xff
-
-  // Hang other CPUs
-  cbnz x0, proc_hang
+  // Preserve flattened devicetree pointer
+  mov x19, x0
 
   // Initialize bss
   ldr x0, =_sbss
@@ -21,6 +17,8 @@ _start:
   // Initialize stack
   ldr x0, =_stack_top
   mov sp, x0
+  // Pass flattened devicetree pointer
+  mov x0, x19
   bl start_kernel
 
   // Should never return

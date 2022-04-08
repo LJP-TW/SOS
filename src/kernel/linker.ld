@@ -1,15 +1,9 @@
 _stack_top = 0x400000;
+_smem      = 0x7000000;
+_emem      = 0x7ffffff;
 
 SECTIONS
 {
-  . = 0x0;
-
-  _sbss = .;
-  .bss : {
-    *(.bss*)
-  }
-  _ebss = .;
-
   . = 0x80000;
   
   .text.boot : {
@@ -25,8 +19,16 @@ SECTIONS
   }
 
   .data : {
-    *(.data)
+    *(.got)
+    *(.got.plt)
+    *(.data*)
   }
+
+  _sbss = .;
+  .bss : {
+    *(.bss*)
+  }
+  _ebss = .;
   
   . = _stack_top;
   _sstack = .;

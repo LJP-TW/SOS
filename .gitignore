@@ -2,6 +2,10 @@
 *.elf
 *.img
 image
+initramfs.cpio
 !prebuild/*
 !img/*
 .gdbinit
+test/*
+pty.log
+mnt/*

@@ -1,11 +1,25 @@
 // Ref: https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/src/mini_uart.c
+#include <stdarg.h>
 #include <mini_uart.h>
 #include <BCM2837.h>
 #include <utils.h>
 
-int uart_recvline(char *buff, int maxlen)
+#define SIGN        1
+
+uint32 uart_recv_uint(void)
 {
-    int cnt = 0;
+    char buf[4];
+    
+    for (int i = 0; i < 4; ++i) {
+        buf[i] = uart_recv();
+    }
+
+    return *((uint32*)buf);
+}
+
+uint32 uart_recvline(char *buff, int maxlen)
+{
+    uint32 cnt = 0;
 
     // Reserve space for NULL byte
     maxlen--;
@@ -37,6 +51,13 @@ void uart_send(char c)
     put32(AUX_MU_IO_REG, c);
 }
 
+void uart_sendn(char *str, int n)
+{
+    while (n--) {
+        uart_send(*str++);
+    }
+}
+
 char uart_recv(void)
 {
     while (!(get32(AUX_MU_LSR_REG) & 0x01)) {};
@@ -44,33 +65,85 @@ char uart_recv(void)
     return (get32(AUX_MU_IO_REG) & 0xFF);
 }
 
-void uart_send_string(char *str)
+static void uart_send_string(const char *str)
 {
     for (int i = 0; str[i] != '\0'; i++) {
         uart_send(str[i]);
     }
 }
 
+// Ref: https://elixir.bootlin.com/linux/v3.5/source/arch/x86/boot/printf.c#L43
 /*
- * Send hex uint to UART
+ * @num: output number 
+ * @base: 10 or 16
  */
-void uart_send_uint(unsigned int num)
+static void uart_send_num(int32 num, int base, int type)
 {
-    int shift = 32;
-    uart_send_string("0x");
+    static const char digits[16] = "0123456789ABCDEF";
+    char tmp[66];
+    int i;
 
-    while (shift) {
-        int n = num >> (shift - 4) & 0xf;
+    if (type | SIGN) {
+        if (num < 0) {
+            uart_send('-');
+        }
+    }
 
-        if (0 <= n && n <= 9) {
-            char c = '0' + n;
-            uart_send(c);
-        } else {
-            char c = 'A' + n - 10;
-            uart_send(c);
+    i = 0;
+
+    if (num == 0) {
+        tmp[i++] = '0';
+    } else {
+        while (num != 0) {
+            uint8 r = (uint32)num % base;
+            num = (uint32)num / base;
+            tmp[i++] = digits[r];
+        }
+    }
+
+    while (--i >= 0) {
+        uart_send(tmp[i]);
+    }
+}
+
+// Ref: https://elixir.bootlin.com/linux/v3.5/source/arch/x86/boot/printf.c#L115
+void uart_printf(char *fmt, ...)
+{
+    // uart_send_string(fmt);
+    // uart_send_string("\r\n");
+
+    const char *s;
+    char c;
+    uint32 num;   
+
+    va_list args;
+    va_start(args, fmt);
+
+    for (; *fmt; ++fmt) {
+        if (*fmt != '%') {
+            uart_send(*fmt);
+            continue;
         }
 
-        shift -= 4;
+        ++fmt;
+        switch (*fmt) {
+        case 'c':
+            c = va_arg(args, uint32) & 0xff;
+            uart_send(c);
+            continue;
+        case 'd':
+            num = va_arg(args, int32);
+            uart_send_num(num, 10, SIGN);
+            continue;
+        case 's':
+            s = va_arg(args, char *);
+            uart_send_string(s);
+            continue;
+        case 'x':
+            num = va_arg(args, uint32);
+            uart_send_num(num, 16, 0);
+            continue;
+        }
     }
 }
 
