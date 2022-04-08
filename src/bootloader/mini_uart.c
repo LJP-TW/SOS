@@ -6,6 +6,22 @@
 
 #define SIGN        1
 
+#define BUFSIZE 0x100
+
+char uart_recv(void)
+{
+    while (!(get32(AUX_MU_LSR_REG) & 0x01)) {};
+
+    return (get32(AUX_MU_IO_REG) & 0xFF);
+}
+
+void uart_send(char c)
+{
+    while (!(get32(AUX_MU_LSR_REG) & 0x20)) {};
+
+    put32(AUX_MU_IO_REG, c);
+}
+
 uint32 uart_recv_uint(void)
 {
     char buf[4];
@@ -44,25 +60,11 @@ uint32 uart_recvline(char *buff, int maxlen)
     return cnt;
 }
 
-void uart_send(char c)
-{
-    while (!(get32(AUX_MU_LSR_REG) & 0x20)) {};
-
-    put32(AUX_MU_IO_REG, c);
-}
-
 void uart_sendn(char *str, int n)
 {
     while (n--) {
         uart_send(*str++);
     }
-}
-
-char uart_recv(void)
-{
-    while (!(get32(AUX_MU_LSR_REG) & 0x01)) {};
-
-    return (get32(AUX_MU_IO_REG) & 0xFF);
 }
 
 static void uart_send_string(const char *str)
@@ -77,7 +79,7 @@ static void uart_send_string(const char *str)
  * @num: output number 
  * @base: 10 or 16
  */
-static void uart_send_num(int32 num, int base, int type)
+static void uart_send_num(int64 num, int base, int type)
 {
     static const char digits[16] = "0123456789ABCDEF";
     char tmp[66];
@@ -109,12 +111,10 @@ static void uart_send_num(int32 num, int base, int type)
 // Ref: https://elixir.bootlin.com/linux/v3.5/source/arch/x86/boot/printf.c#L115
 void uart_printf(char *fmt, ...)
 {
-    // uart_send_string(fmt);
-    // uart_send_string("\r\n");
-
     const char *s;
     char c;
-    uint32 num;   
+    uint64 num;
+    char width;
 
     va_list args;
     va_start(args, fmt);
@@ -126,13 +126,25 @@ void uart_printf(char *fmt, ...)
         }
 
         ++fmt;
+
+        // Get width
+        width = 0;
+        if (fmt[0] == 'l' && fmt[1] == 'l') {
+            width = 1;
+            fmt += 2;
+        }
+
         switch (*fmt) {
         case 'c':
             c = va_arg(args, uint32) & 0xff;
             uart_send(c);
             continue;
         case 'd':
-            num = va_arg(args, int32);
+            if (width) {
+                num = va_arg(args, int64);
+            } else {
+                num = va_arg(args, int32);
+            }
             uart_send_num(num, 10, SIGN);
             continue;
         case 's':
@@ -140,7 +152,11 @@ void uart_printf(char *fmt, ...)
             uart_send_string(s);
             continue;
         case 'x':
-            num = va_arg(args, uint32);
+            if (width) {
+                num = va_arg(args, uint64);
+            } else {
+                num = va_arg(args, uint32);
+            }
             uart_send_num(num, 16, 0);
             continue;
         }

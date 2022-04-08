@@ -1,6 +1,8 @@
 #include <cpio.h>
 #include <mini_uart.h>
 #include <string.h>
+#include <mem.h>
+#include <mm.h>
 
 struct cpio_newc_header {
     char    c_magic[6];
@@ -47,7 +49,7 @@ void cpio_ls(char *cpio)
     char *cur = cpio;
 
     while (1) {        
-        struct cpio_newc_header *pheader = cur;
+        struct cpio_newc_header *pheader = (struct cpio_newc_header *)cur;
         cur += sizeof(struct cpio_newc_header);
 
         // 070701
@@ -86,7 +88,7 @@ void cpio_cat(char *cpio, char *filename)
     char *cur = cpio;
 
     while (1) {        
-        struct cpio_newc_header *pheader = cur;
+        struct cpio_newc_header *pheader = (struct cpio_newc_header *)cur;
         cur += sizeof(struct cpio_newc_header);
 
         // 070701
@@ -124,4 +126,49 @@ void cpio_cat(char *cpio, char *filename)
             return;
         }
     }
+}
+
+char *cpio_load_prog(char *cpio, char *filename)
+{
+    char *cur = cpio;
+
+    while (1) {        
+        struct cpio_newc_header *pheader = (struct cpio_newc_header *)cur;
+        cur += sizeof(struct cpio_newc_header);
+
+        // 070701
+        if (*(uint32 *)&pheader->c_magic[0] != 0x37303730 &&
+            *(uint16 *)&pheader->c_magic[4] != 0x3130) {
+            uart_printf("[*] Only support new ASCII format of cpio.\r\n");
+            return NULL;
+        }
+
+        uint32 namesize = _cpio_read_8hex(pheader->c_namesize);
+        uint32 filesize = _cpio_read_8hex(pheader->c_filesize);
+        
+        // The pathname is followed by NUL bytes so that the total size of the 
+        // fixed header plus pathname is a multiple of four. Likewise, the file
+        // data is padded to a multiple of four bytes
+        uint32 adj_namesize = ALIGN(namesize + 
+                                    sizeof(struct cpio_newc_header), 4)
+                              - sizeof(struct cpio_newc_header);
+        uint32 adj_filesize = ALIGN(filesize, 4);
+        char *curfilename  = cur;
+        cur += adj_namesize;
+        char *curcontent   = cur;
+        cur += adj_filesize;
+
+        if (!strcmp(filename, curfilename)) {
+            // Found it!
+            char *mem = (char *)simple_malloc(filesize);
+            memncpy(mem, curcontent, filesize);
+            return mem;
+        }
+
+        // TRAILER!!!
+        if (namesize == 0xb && !strcmp(curfilename, "TRAILER!!!")) {
+            uart_printf("[*] File not found.\r\n");
+            return NULL;
+        }
+    } 
 }

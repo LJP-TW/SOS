@@ -3,8 +3,8 @@
 
 #ifndef __ASSEMBLER__
 
-void memzero(unsigned long src, unsigned long n);
-void memncpy(unsigned long dst, unsigned long src, unsigned long n);
+void memzero(char *src, unsigned long n);
+void memncpy(char *dst, char *src, unsigned long n);
 
 #endif /* __ASSEMBLER__ */
 

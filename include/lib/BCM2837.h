@@ -44,6 +44,9 @@
 #define GPPUDCLK0 BUS_TO_PERIPHERALS(0x7E200098)
 #define GPPUDCLK1 BUS_TO_PERIPHERALS(0x7E20009c)
 
+// Interrupt
+#define IRQ_ENABLE_1_REG BUS_TO_PERIPHERALS(0x7E00B210)
+
 void BCM2837_reset(int tick);
 void BCM2837_cancel_reset();
 

@@ -1,6 +1,8 @@
 #ifndef _TYPES_H
 #define _TYPES_H
 
+#include <stddef.h>
+
 typedef unsigned long long int uint64;
 typedef unsigned int uint32;
 typedef unsigned short uint16;
@@ -11,8 +13,8 @@ typedef int int32;
 typedef short int16;
 typedef char int8;
 
-typedef uint32 size_t;
-
 #define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
+
+#define TO_CHAR_PTR(a) ((char *)(uint64)(a))
 
 #endif /* _TYPES_H */

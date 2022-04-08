@@ -7,8 +7,13 @@ memzero:
 
 .globl memncpy
 memncpy:
-    ldr x3, [x1], #8
-    str x3, [x0], #8
-    subs x2, x2, #8
-    b.gt memncpy
+    b memncpy_1_cmp
+memncpy_1:
+    ldrb w3, [x1], #1
+    strb w3, [x0], #1
+    subs x2, x2, #1
+memncpy_1_cmp:
+    cmp x2, 1
+    bge memncpy_1
+memncpy_ok:
     ret

@@ -100,7 +100,8 @@ $(IMG_NAME):
 
 .PHONY: clean
 clean:
-	rm -f $(KERNEL_OBJ_FILES) $(BOOTLOADER_OBJ_FILES) $(KERNEL_ELF) $(BOOTLOADER_ELF)
+	rm -f $(KERNEL_OBJ_FILES) $(BOOTLOADER_OBJ_FILES) $(KERNEL_ELF) \
+		  $(BOOTLOADER_ELF) $(LIB_OBJ_FILES)
 
 .PHONY: clean-all
 clean-all: clean
