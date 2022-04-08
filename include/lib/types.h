@@ -13,8 +13,4 @@ typedef int int32;
 typedef short int16;
 typedef char int8;
 
-#define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
-
-#define TO_CHAR_PTR(a) ((char *)(uint64)(a))
-
 #endif /* _TYPES_H */

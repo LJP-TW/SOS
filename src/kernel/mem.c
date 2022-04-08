@@ -1,5 +1,6 @@
 #include <mem.h>
 #include <mini_uart.h>
+#include <utils.h>
 
 char _smem;
 char _emem;

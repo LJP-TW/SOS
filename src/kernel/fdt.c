@@ -1,6 +1,7 @@
 #include <fdt.h>
 #include <string.h>
 #include <mini_uart.h>
+#include <utils.h>
 
 static void _print_tab(int level)
 {

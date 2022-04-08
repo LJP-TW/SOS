@@ -9,7 +9,6 @@
 #include <utils.h>
 #include <timer.h>
 #include <irq.h>
-#include <mm.h>
 
 #define BUFSIZE 0x100
 

@@ -2,7 +2,7 @@
 #include <mini_uart.h>
 #include <string.h>
 #include <mem.h>
-#include <mm.h>
+#include <utils.h>
 
 struct cpio_newc_header {
     char    c_magic[6];
