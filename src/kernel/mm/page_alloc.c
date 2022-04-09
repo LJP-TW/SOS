@@ -52,36 +52,70 @@ static inline int is_valid_page(void *page)
     return 1;
 }
 
+void mem_reserve(void *start, void *end)
+{
+    start = (void *)((uint64)start & ~(PAGE_SIZE - 1));
+    end = (void *)ALIGN((uint64)end, PAGE_SIZE);
+
+    for (; start < end; start = (void *)((uint64)start + PAGE_SIZE)) {
+        int idx = addr2idx(start);
+
+        frame_ents[idx].allocated = 1;
+
+#ifdef DEBUG
+        uart_printf("[*] preserve page idx %d (%llx)\r\n", idx, start);
+#endif
+    }
+}
+
 void page_allocator_init(void)
 {
-    int idx, exp, size;
-
     for (int i = 0; i < FREELIST_CNT; ++i) {
         INIT_LIST_HEAD(&freelists[i]);
     }
 
-    idx = 0;
-    exp = FREELIST_CNT - 1;
-    size = 1 << exp;
+    // Merge buddys from bottom to top
+    for (int exp = 0, idx; exp + 1 < FREELIST_CNT; exp++) {
+        idx = 0;
 
-    while (idx != FRAME_ARRAY_SIZE) {
-        frame_hdr *hdr;
+        while (1) {
+            int buddy_idx;
+            
+            buddy_idx = idx ^ (1 << exp);
 
-        if (idx + size <= FRAME_ARRAY_SIZE) {
-            frame_ents[idx].exp = exp;
-            frame_ents[idx].allocated = 0;
+            if (buddy_idx >= FRAME_ARRAY_SIZE) {
+                break;
+            }
+
+            if (!frame_ents[idx].allocated &&
+                frame_ents[idx].exp == exp &&
+                !frame_ents[buddy_idx].allocated &&
+                frame_ents[buddy_idx].exp == exp) {
+                frame_ents[idx].exp = exp + 1;
+            }
+
+            idx += (1 << (exp + 1));
+
+            if (idx >= FRAME_ARRAY_SIZE) {
+                break;
+            }
+        }
+    }
+
+    // Update freelists
+    for (int idx = 0, exp; idx < FRAME_ARRAY_SIZE; idx += (1 << exp)) {
+        exp = frame_ents[idx].exp;
+
+        if (!frame_ents[idx].allocated) {
+            frame_hdr *hdr;
 
             hdr = idx2addr(idx);
             list_add_tail(&hdr->list, &freelists[exp]);
 
 #ifdef DEBUG
-    uart_printf("[*] page init, idx %d belong to exp %d\r\n", idx, exp);
+            uart_printf("[*] page init, idx %d belong to exp %d\r\n",
+                        idx, exp);
 #endif
-
-            idx += size;
-        } else {
-            --exp;
-            size >>= 1;
         }
     }
 }
@@ -136,8 +170,8 @@ void *alloc_pages(int num)
         list_add(&buddy_hdr->list, &freelists[topexp]);
 
 #ifdef DEBUG
-    uart_printf("[*] Expand to idx (%d, %d) to exp (%d)\r\n", 
-        idx, buddy_idx, topexp);
+        uart_printf("[*] Expand to idx (%d, %d) to exp (%d)\r\n",
+            idx, buddy_idx, topexp);
 #endif
     }
 
@@ -174,8 +208,8 @@ static inline void _free_page(frame_hdr *page)
            !frame_ents[buddy_idx].allocated &&
            frame_ents[buddy_idx].exp == exp) {
 #ifdef DEBUG
-    uart_printf("[*] merge idx (%d, %d) to exp (%d)\r\n", 
-                idx, buddy_idx, exp + 1);
+        uart_printf("[*] merge idx (%d, %d) to exp (%d)\r\n",
+                    idx, buddy_idx, exp + 1);
 #endif
 
         frame_hdr *hdr;

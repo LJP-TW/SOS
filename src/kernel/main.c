@@ -260,6 +260,11 @@ void start_kernel(char *fdt)
     uart_printf("[*] fdt base: %x\r\n", fdt_base);
     uart_printf("[*] Kernel\r\n");
 
+#ifdef DEBUG
+    mem_reserve((void *)0x10000000, (void *)0x10000800);
+    mem_reserve((void *)0x10002700, (void *)0x10005800);
+#endif
+
     /* 
      * page_allocator_init() might output some debug information via mini-uart.
      * uart_init() needs to be called before calling page_allocator_init().

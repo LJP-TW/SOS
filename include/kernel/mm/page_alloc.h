@@ -25,6 +25,12 @@ static inline int addr2idx(void *hdr)
     return ((char *)hdr - (char *)BUDDY_BASE) / PAGE_SIZE;
 }
 
+/*
+ * Reserve @start ~ @end memory.
+ * mem_reserve() must be called before calling page_allocator_init().
+ */
+void mem_reserve(void *start, void *end);
+
 void page_allocator_init(void);
 
 /*
