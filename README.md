@@ -18,6 +18,11 @@ sudo apt-get install gcc-aarch64-linux-gnu qemu-system-arm
 make
 ```
 
+* Build kernel8.img with some debug information:
+```
+make DEBUG=1
+```
+
 * Build myos.img (which you can dd to SD card):
 ```
 make image
@@ -33,5 +38,5 @@ make qemu
 ## How to burn it into pi3
 
 ```
-dd if=./myos.img of=/dev/<your SD card device>
+dd if=./build/myos.img of=/dev/<your SD card device>
 ```
