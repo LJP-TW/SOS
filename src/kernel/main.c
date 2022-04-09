@@ -120,7 +120,7 @@ static void cmd_exec(char *filename)
     }
 
     // TODO: Set stack of user program properly
-    user_sp = (char *)0x10000000;
+    user_sp = (char *)0xf000000;
 
     exec_user_prog(mem, user_sp);
 }
