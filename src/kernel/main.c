@@ -10,6 +10,7 @@
 #include <timer.h>
 #include <irq.h>
 #include <mm/page_alloc.h>
+#include <mm/sc_alloc.h>
 
 #define BUFSIZE 0x100
 
@@ -264,12 +265,14 @@ void start_kernel(char *fdt)
      * uart_init() needs to be called before calling page_allocator_init().
      */
     page_allocator_init();
+    sc_init();
 
     timer_init();
     initramfs_init();
 
 #ifdef DEBUG
     page_allocator_test();
+    sc_test();
 #endif
 
     // Enable interrupt from Auxiliary peripherals

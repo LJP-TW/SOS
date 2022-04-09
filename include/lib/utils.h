@@ -39,6 +39,8 @@ void memncpy(char *dst, char *src, unsigned long n);
 #define get_elem_idx(elem, array) \
     (((char *)elem - (char *)array) / sizeof(array[0]))
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
+
 #define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
 
 #define TO_CHAR_PTR(a) ((char *)(uint64)(a))

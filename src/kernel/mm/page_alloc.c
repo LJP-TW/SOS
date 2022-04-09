@@ -10,12 +10,6 @@
 #include <bitops.h>
 #include <mini_uart.h>
 
-#define SBUDDY 0x10000000
-#define EBUDDY 0x20000000
-#define BUDDY_BASE SBUDDY
-
-#define FRAME_ARRAY_SIZE ((EBUDDY - SBUDDY) / PAGE_SIZE)
-
 #define FREELIST_CNT 16
 
 typedef struct {
@@ -31,22 +25,6 @@ typedef struct {
 frame_ent frame_ents[FRAME_ARRAY_SIZE];
 
 struct list_head freelists[FREELIST_CNT];
-
-/*
- * Convert frame idx to the frame address
- */
-static inline frame_hdr *idx2addr(int idx)
-{
-    return (frame_hdr *)((uint64)BUDDY_BASE + idx * PAGE_SIZE);
-}
-
-/*
- * Convert frame address to the frame idx
- */
-static inline int addr2idx(frame_hdr *hdr)
-{
-    return ((char *)hdr - (char *)BUDDY_BASE) / PAGE_SIZE;
-}
 
 /*
  * Convert number of pages to the corresponding idx (or say exp) of freelists
@@ -227,7 +205,7 @@ void free_page(void *page)
     }
 
 #ifdef DEBUG
-    uart_printf("[*] free_page idx %d\r\n", addr2idx((frame_hdr *)page));
+    uart_printf("[*] free_page idx %d\r\n", addr2idx(page));
 #endif
 
     _free_page((frame_hdr *)page);
