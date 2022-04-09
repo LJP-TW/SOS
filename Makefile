@@ -27,18 +27,25 @@ RPI3_DTB   := $(IMG_DIR)/bcm2710-rpi-3-b-plus.dtb
 
 IMG_FILES             = $(wildcard $(IMG_DIR)/*)
 INITRAMFS_FILES       = $(wildcard $(INITRAMFS_DIR)/*)
-BOOTLOADER_C_FILES    = $(wildcard $(SRC_DIR)/$(BOOTLOADER_DIR)/*.c)
-BOOTLOADER_ASM_FILES  = $(wildcard $(SRC_DIR)/$(BOOTLOADER_DIR)/*.S)
-BOOTLOADER_OBJ_FILES  = $(BOOTLOADER_ASM_FILES:$(SRC_DIR)/$(BOOTLOADER_DIR)/%.S=$(BUILD_DIR)/$(BOOTLOADER_DIR)/%_s.o)
-BOOTLOADER_OBJ_FILES += $(BOOTLOADER_C_FILES:$(SRC_DIR)/$(BOOTLOADER_DIR)/%.c=$(BUILD_DIR)/$(BOOTLOADER_DIR)/%_c.o)
-KERNEL_C_FILES    = $(wildcard $(SRC_DIR)/$(KERNEL_DIR)/*.c)
-KERNEL_ASM_FILES  = $(wildcard $(SRC_DIR)/$(KERNEL_DIR)/*.S)
-KERNEL_OBJ_FILES  = $(KERNEL_ASM_FILES:$(SRC_DIR)/$(KERNEL_DIR)/%.S=$(BUILD_DIR)/$(KERNEL_DIR)/%_s.o)
-KERNEL_OBJ_FILES += $(KERNEL_C_FILES:$(SRC_DIR)/$(KERNEL_DIR)/%.c=$(BUILD_DIR)/$(KERNEL_DIR)/%_c.o)
-LIB_C_FILES    = $(wildcard $(SRC_DIR)/$(LIB_DIR)/*.c)
-LIB_ASM_FILES  = $(wildcard $(SRC_DIR)/$(LIB_DIR)/*.S)
-LIB_OBJ_FILES  = $(LIB_ASM_FILES:$(SRC_DIR)/$(LIB_DIR)/%.S=$(BUILD_DIR)/$(LIB_DIR)/%_s.o)
-LIB_OBJ_FILES += $(LIB_C_FILES:$(SRC_DIR)/$(LIB_DIR)/%.c=$(BUILD_DIR)/$(LIB_DIR)/%_c.o)
+
+BOOTLOADER_C_FILES    = $(shell find "$(SRC_DIR)/$(BOOTLOADER_DIR)" -name "*.c")
+BOOTLOADER_ASM_FILES += $(shell find "$(SRC_DIR)/$(BOOTLOADER_DIR)" -name "*.S")
+BOOTLOADER_OBJ_FILES  = $(patsubst $(SRC_DIR)/$(BOOTLOADER_DIR)/%.c,$(BUILD_DIR)/$(BOOTLOADER_DIR)/%_c.o,$(BOOTLOADER_C_FILES))
+BOOTLOADER_OBJ_FILES += $(patsubst $(SRC_DIR)/$(BOOTLOADER_DIR)/%.S,$(BUILD_DIR)/$(BOOTLOADER_DIR)/%_s.o,$(BOOTLOADER_ASM_FILES))
+
+KERNEL_C_FILES    = $(shell find "$(SRC_DIR)/$(KERNEL_DIR)" -name "*.c")
+KERNEL_ASM_FILES += $(shell find "$(SRC_DIR)/$(KERNEL_DIR)" -name "*.S")
+KERNEL_OBJ_FILES  = $(patsubst $(SRC_DIR)/$(KERNEL_DIR)/%.c,$(BUILD_DIR)/$(KERNEL_DIR)/%_c.o,$(KERNEL_C_FILES))
+KERNEL_OBJ_FILES += $(patsubst $(SRC_DIR)/$(KERNEL_DIR)/%.S,$(BUILD_DIR)/$(KERNEL_DIR)/%_s.o,$(KERNEL_ASM_FILES))
+
+LIB_C_FILES    = $(shell find "$(SRC_DIR)/$(LIB_DIR)" -name "*.c")
+LIB_ASM_FILES += $(shell find "$(SRC_DIR)/$(LIB_DIR)" -name "*.S")
+LIB_OBJ_FILES  = $(patsubst $(SRC_DIR)/$(LIB_DIR)/%.c,$(BUILD_DIR)/$(LIB_DIR)/%_c.o,$(LIB_C_FILES))
+LIB_OBJ_FILES += $(patsubst $(SRC_DIR)/$(LIB_DIR)/%.S,$(BUILD_DIR)/$(LIB_DIR)/%_s.o,$(LIB_ASM_FILES))
+
+ifdef DEBUG
+   CFLAGS += -g -DDEBUG
+endif
 
 all: $(KERNEL_IMG) $(BOOTLOADER_IMG)
 

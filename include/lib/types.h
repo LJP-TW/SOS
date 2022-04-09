@@ -13,4 +13,6 @@ typedef int int32;
 typedef short int16;
 typedef char int8;
 
+#define PAGE_SIZE 0x1000
+
 #endif /* _TYPES_H */

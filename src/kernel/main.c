@@ -9,6 +9,7 @@
 #include <utils.h>
 #include <timer.h>
 #include <irq.h>
+#include <mm/page_alloc.h>
 
 #define BUFSIZE 0x100
 
@@ -258,8 +259,18 @@ void start_kernel(char *fdt)
     uart_printf("[*] fdt base: %x\r\n", fdt_base);
     uart_printf("[*] Kernel\r\n");
 
+    /* 
+     * page_allocator_init() might output some debug information via mini-uart.
+     * uart_init() needs to be called before calling page_allocator_init().
+     */
+    page_allocator_init();
+
     timer_init();
     initramfs_init();
+
+#ifdef DEBUG
+    page_allocator_test();
+#endif
 
     // Enable interrupt from Auxiliary peripherals
     irq1_enable(29);
