@@ -100,7 +100,7 @@ void *sc_alloc(int size)
         }
 
 #ifdef DEBUG
-        uart_printf("[sc] Create chunks (page: %d; size: %d)\r\n", 
+        uart_sync_printf("[sc] Create chunks (page: %d; size: %d)\r\n", 
                     frame_idx, sc_sizes[size_idx]);
 #endif
     }
@@ -109,7 +109,7 @@ void *sc_alloc(int size)
     list_del(&hdr->list);
 
 #ifdef DEBUG
-    uart_printf("[sc] Allocate chunks %llx (request: %d; chunksize: %d)\r\n", 
+    uart_sync_printf("[sc] Allocate chunks %llx (request: %d; chunksize: %d)\r\n", 
                 hdr,
                 size,
                 sc_sizes[size_idx]);
@@ -136,7 +136,7 @@ int sc_free(void *sc)
     list_add(&hdr->list, &sc_freelists[size_idx]);
 
 #ifdef DEBUG
-    uart_printf("[sc] Free chunks %llx(size: %d)\r\n", 
+    uart_sync_printf("[sc] Free chunks %llx(size: %d)\r\n", 
                 sc,
                 sc_sizes[size_idx]);
 #endif

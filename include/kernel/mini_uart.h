@@ -11,6 +11,8 @@ void uart_send(char c);
 void uart_sendn(char *str, int n);
 void uart_printf(char *fmt, ...);
 
+void uart_sync_printf(char *fmt, ...);
+
 void uart_irq_check(void);
 void uart_irq_handler(void);
 

@@ -72,7 +72,7 @@ void page_allocator_early_init(void *start, void *end)
     }
 
 #ifdef DEBUG
-    uart_printf("[*] init buddy (%llx ~ %llx)\r\n", buddy_base, buddy_end);
+    uart_sync_printf("[*] init buddy (%llx ~ %llx)\r\n", buddy_base, buddy_end);
 #endif
 }
 
@@ -87,7 +87,7 @@ void mem_reserve(void *start, void *end)
         frame_ents[idx].allocated = 1;
 
 #ifdef DEBUG
-        uart_printf("[*] preserve page idx %d (%llx)\r\n", idx, start);
+        uart_sync_printf("[*] preserve page idx %d (%llx)\r\n", idx, start);
 #endif
     }
 }
@@ -137,7 +137,7 @@ void page_allocator_init(void)
             list_add_tail(&hdr->list, &freelists[exp]);
 
 #ifdef DEBUG
-            uart_printf("[*] page init, idx %d belong to exp %d\r\n",
+            uart_sync_printf("[*] page init, idx %d belong to exp %d\r\n",
                         idx, exp);
 #endif
         }
@@ -150,7 +150,7 @@ void *alloc_pages(int num)
     int idx, topexp, exp;
 
 #ifdef DEBUG
-    uart_printf("[*] alloc_pages %d pages\r\n", num);
+    uart_sync_printf("[*] alloc_pages %d pages\r\n", num);
 #endif
 
     if (!num) {
@@ -194,7 +194,7 @@ void *alloc_pages(int num)
         list_add(&buddy_hdr->list, &freelists[topexp]);
 
 #ifdef DEBUG
-        uart_printf("[*] Expand to idx (%d, %d) to exp (%d)\r\n",
+        uart_sync_printf("[*] Expand to idx (%d, %d) to exp (%d)\r\n",
             idx, buddy_idx, topexp);
 #endif
     }
@@ -203,7 +203,7 @@ void *alloc_pages(int num)
     frame_ents[idx].allocated = 1;
 
 #ifdef DEBUG
-    uart_printf("[*] Allocate idx %d exp %d\r\n", 
+    uart_sync_printf("[*] Allocate idx %d exp %d\r\n", 
         idx, exp);
 #endif
 
@@ -232,7 +232,7 @@ static inline void _free_page(frame_hdr *page)
            !frame_ents[buddy_idx].allocated &&
            frame_ents[buddy_idx].exp == exp) {
 #ifdef DEBUG
-        uart_printf("[*] merge idx (%d, %d) to exp (%d)\r\n",
+        uart_sync_printf("[*] merge idx (%d, %d) to exp (%d)\r\n",
                     idx, buddy_idx, exp + 1);
 #endif
 
@@ -263,7 +263,7 @@ void free_page(void *page)
     }
 
 #ifdef DEBUG
-    uart_printf("[*] free_page idx %d\r\n", addr2idx(page));
+    uart_sync_printf("[*] free_page idx %d\r\n", addr2idx(page));
 #endif
 
     _free_page((frame_hdr *)page);
