@@ -3,6 +3,8 @@
 #include <mini_uart.h>
 #include <utils.h>
 
+char *fdt_base;
+
 static void _print_tab(int level)
 {
     while (level--) {

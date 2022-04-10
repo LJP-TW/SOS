@@ -4,6 +4,7 @@
 
 // TODO: Consider critical section
 
+#include <mm/early_alloc.h>
 #include <mm/page_alloc.h>
 #include <mm/sc_alloc.h>
 #include <list.h>
@@ -32,7 +33,7 @@ typedef struct {
     struct list_head list;
 } sc_hdr;
 
-sc_frame_ent sc_frame_ents[FRAME_ARRAY_SIZE];
+sc_frame_ent *sc_frame_ents;
 
 struct list_head sc_freelists[ARRAY_SIZE(sc_sizes)];
 
@@ -50,6 +51,11 @@ static uint8 find_size_idx(int size)
     if (size <= 0x1000) return 9;
     /* Never reach */
     return -1;
+}
+
+void sc_early_init(void)
+{
+    sc_frame_ents = early_malloc(sizeof(sc_frame_ent) * frame_ents_size);
 }
 
 void sc_init(void)

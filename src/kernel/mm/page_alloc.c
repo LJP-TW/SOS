@@ -4,6 +4,7 @@
 
 // TODO: Consider critical section
 
+#include <mm/early_alloc.h>
 #include <mm/page_alloc.h>
 #include <list.h>
 #include <utils.h>
@@ -22,7 +23,11 @@ typedef struct {
     struct list_head list;
 } frame_hdr;
 
-frame_ent frame_ents[FRAME_ARRAY_SIZE];
+uint64 buddy_base;
+uint64 buddy_end;
+
+frame_ent *frame_ents;
+uint32 frame_ents_size;
 
 struct list_head freelists[FREELIST_CNT];
 
@@ -43,13 +48,32 @@ static inline int num2exp(int num)
 
 static inline int is_valid_page(void *page)
 {
-    if ((char *)SBUDDY > (char *)page ||
-        (char *)page >= (char *)EBUDDY ||
+    if (buddy_base > (uint64)page ||
+        (uint64)page >= buddy_end ||
         (uint64)page & (PAGE_SIZE - 1)) {
             return 0;
     }
 
     return 1;
+}
+
+void page_allocator_early_init(void *start, void *end)
+{
+    buddy_base = (uint64)start;
+    buddy_end = (uint64)end;
+
+    frame_ents_size = (buddy_end - buddy_base) / PAGE_SIZE;
+
+    frame_ents = early_malloc(sizeof(frame_ent) * frame_ents_size);
+
+    for (int i = 0; i < frame_ents_size; ++i) {
+        frame_ents[i].exp = 0;
+        frame_ents[i].allocated = 0;
+    }
+
+#ifdef DEBUG
+    uart_printf("[*] init buddy (%llx ~ %llx)\r\n", buddy_base, buddy_end);
+#endif
 }
 
 void mem_reserve(void *start, void *end)
@@ -83,7 +107,7 @@ void page_allocator_init(void)
             
             buddy_idx = idx ^ (1 << exp);
 
-            if (buddy_idx >= FRAME_ARRAY_SIZE) {
+            if (buddy_idx >= frame_ents_size) {
                 break;
             }
 
@@ -96,14 +120,14 @@ void page_allocator_init(void)
 
             idx += (1 << (exp + 1));
 
-            if (idx >= FRAME_ARRAY_SIZE) {
+            if (idx >= frame_ents_size) {
                 break;
             }
         }
     }
 
     // Update freelists
-    for (int idx = 0, exp; idx < FRAME_ARRAY_SIZE; idx += (1 << exp)) {
+    for (int idx = 0, exp; idx < frame_ents_size; idx += (1 << exp)) {
         exp = frame_ents[idx].exp;
 
         if (!frame_ents[idx].allocated) {

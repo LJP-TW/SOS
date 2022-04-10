@@ -3,18 +3,17 @@
 
 #include <types.h>
 
-#define SBUDDY 0x10000000
-#define EBUDDY 0x20000000
-#define BUDDY_BASE SBUDDY
-
-#define FRAME_ARRAY_SIZE ((EBUDDY - SBUDDY) / PAGE_SIZE)
+/* Initialize by page_allocator_early_init() */
+extern uint32 frame_ents_size;
+extern uint64 buddy_base;
+extern uint64 buddy_end;
 
 /*
  * Convert frame idx to the frame address
  */
 static inline void *idx2addr(int idx)
 {
-    return (void *)((uint64)BUDDY_BASE + idx * PAGE_SIZE);
+    return (void *)(buddy_base + idx * PAGE_SIZE);
 }
 
 /*
@@ -22,8 +21,14 @@ static inline void *idx2addr(int idx)
  */
 static inline int addr2idx(void *hdr)
 {
-    return ((char *)hdr - (char *)BUDDY_BASE) / PAGE_SIZE;
+    return ((uint64)hdr - buddy_base) / PAGE_SIZE;
 }
+
+/*
+ * Initialize @start ~ @end memory for buddy system
+ * page_allocator_early_init() must be called before calling mem_reserve().
+ */
+void page_allocator_early_init(void *start, void *end);
 
 /*
  * Reserve @start ~ @end memory.

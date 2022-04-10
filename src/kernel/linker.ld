@@ -1,6 +1,6 @@
-_stack_top = 0x400000;
-_smem      = 0x7000000;
-_emem      = 0x7ffffff;
+_stack_top      = 0x00400000;
+_early_mem_base = 0x07000000;
+_early_mem_end  = 0x07ffffff;
 
 SECTIONS
 {

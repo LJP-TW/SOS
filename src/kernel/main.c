@@ -4,25 +4,22 @@
 #include <rpi3.h>
 #include <cpio.h>
 #include <fdt.h>
-#include <mem.h>
 #include <exec.h>
 #include <utils.h>
 #include <timer.h>
 #include <irq.h>
-#include <mm/page_alloc.h>
-#include <mm/sc_alloc.h>
+#include <mm/mm.h>
 
 #define BUFSIZE 0x100
 
-char *_initramfs;
 static char shell_buf[BUFSIZE];
-char *fdt_base;
 
 static void cmd_alloc(char *ssize)
 {
     int size = atoi(ssize);
     
-    char *p = simple_malloc(size);
+    // TODO: Update early_malloc
+    char *p = early_malloc(size);
 
     uart_printf("[*] p: %x\r\n", p);
 }
@@ -77,7 +74,7 @@ static void cmd_setTimeout(char *msg, char *ssec)
     char *m;
 
     len = strlen(msg) + 1;
-    m = simple_malloc(len);
+    m = early_malloc(len);
     memncpy(m, msg, len);
 
     timer_add_proc((void (*)(void *))uart_printf, m, atoi(ssec));
@@ -101,12 +98,12 @@ static void cmd_sw_uart_mode(void)
 
 static void cmd_ls(void)
 {
-    cpio_ls(_initramfs);
+    cpio_ls(initramfs_base);
 }
 
 static void cmd_cat(char *filename)
 {
-    cpio_cat(_initramfs, filename);
+    cpio_cat(initramfs_base, filename);
 }
 
 static void cmd_exec(char *filename)
@@ -114,7 +111,7 @@ static void cmd_exec(char *filename)
     char *mem;
     char *user_sp;
 
-    mem = cpio_load_prog(_initramfs, filename);
+    mem = cpio_load_prog(initramfs_base, filename);
 
     if (mem == NULL) {
         return;
@@ -214,42 +211,6 @@ static void shell(void)
     }
 }
 
-static int initramfs_fdt_parser(int level, char *cur, char *dt_strings)
-{
-    struct fdt_node_header *nodehdr = (struct fdt_node_header *)cur;
-    struct fdt_property *prop;
-
-    uint32 tag = fdtn_tag(nodehdr);
-
-    switch (tag) {
-    case FDT_PROP:
-        prop = (struct fdt_property *)nodehdr;
-        if (!strcmp("linux,initrd-start", dt_strings + fdtp_nameoff(prop))) {
-            _initramfs = TO_CHAR_PTR(fdt32_ld((fdt32_t *)&prop->data));
-            uart_printf("[*] initrd addr: %x\r\n", _initramfs);
-            return 1;
-        }
-        break;
-    case FDT_BEGIN_NODE:
-    case FDT_END_NODE:
-    case FDT_NOP:
-    case FDT_END:
-        break;
-    }
-
-    return 0;
-}
-
-static void initramfs_init()
-{
-    // Get initramfs address from devicetree
-    _initramfs = NULL;
-    parse_dtb(fdt_base, initramfs_fdt_parser);
-    if (!_initramfs) {
-        uart_printf("[x] Cannot find initrd address!!!\r\n");
-    }
-}
-
 void start_kernel(char *fdt)
 {
     fdt_base = fdt;
@@ -259,26 +220,12 @@ void start_kernel(char *fdt)
     uart_init();
     uart_printf("[*] fdt base: %x\r\n", fdt_base);
     uart_printf("[*] Kernel\r\n");
-
-#ifdef DEBUG
-    mem_reserve((void *)0x10000000, (void *)0x10000800);
-    mem_reserve((void *)0x10002700, (void *)0x10005800);
-#endif
-
-    /* 
-     * page_allocator_init() might output some debug information via mini-uart.
-     * uart_init() needs to be called before calling page_allocator_init().
-     */
-    page_allocator_init();
-    sc_init();
-
-    timer_init();
+    
     initramfs_init();
 
-#ifdef DEBUG
-    page_allocator_test();
-    sc_test();
-#endif
+    mm_init();
+
+    timer_init();
 
     // Enable interrupt from Auxiliary peripherals
     irq1_enable(29);

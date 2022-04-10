@@ -9,3 +9,4 @@ initramfs.cpio
 test/*
 pty.log
 mnt/*
+screenlog.0

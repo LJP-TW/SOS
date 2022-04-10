@@ -3,6 +3,8 @@
 
 #include <types.h>
 
+void sc_early_init(void);
+
 void sc_init(void);
 
 void *sc_alloc(int size);
