@@ -93,3 +93,48 @@ void mm_init(void)
     sc_test();
 #endif
 }
+
+void *kmalloc(int size)
+{
+    uint64 daif;
+    void *ret;
+
+    daif = read_sysreg(DAIF);
+    disable_interrupt();
+
+    if (size <= PAGE_SIZE) {
+        // Use the Small Chunk allocator
+        ret = sc_alloc(size);
+    } else {
+        // Use the Buddy System allocator
+        int page_cnt = ALIGN(size, PAGE_SIZE) / PAGE_SIZE;
+
+        ret = alloc_pages(page_cnt);
+    }
+
+    write_sysreg(DAIF, daif);
+
+    return ret;
+}
+
+void kfree(void *ptr)
+{
+    uint64 daif;
+
+    daif = read_sysreg(DAIF);
+    disable_interrupt();
+
+    if (!sc_free(ptr)) {
+        /*
+         * The chunk pointed to by ptr is managed by the Small Chunk
+         * allocator.
+         */
+        goto _KFREE_END;
+    }
+
+    free_page(ptr);
+
+_KFREE_END:
+
+    write_sysreg(DAIF, daif);
+}

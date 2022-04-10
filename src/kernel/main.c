@@ -14,22 +14,71 @@
 
 static char shell_buf[BUFSIZE];
 
+#define TEST_PTR_CNT 0x10
+
+static uint8 test_ptrs_inused[TEST_PTR_CNT];
+static char *test_ptrs[TEST_PTR_CNT];
+
+static void timeout_print(char *str)
+{
+    uart_printf("%s\r\n", str);
+
+    kfree(str);
+}
+
 static void cmd_alloc(char *ssize)
 {
-    int size = atoi(ssize);
-    
-    // TODO: Update early_malloc
-    char *p = early_malloc(size);
+    int size, idx;
 
-    uart_printf("[*] p: %x\r\n", p);
+    size = atoi(ssize);
+
+    if (size == 0) {
+        return;
+    }
+
+    for (idx = 0; idx < TEST_PTR_CNT; ++idx) {
+        if (!test_ptrs_inused[idx]) {
+            break;
+        }
+    }
+
+    if (idx == TEST_PTR_CNT) {
+        return;
+    }
+
+    test_ptrs_inused[idx] = 1;
+    
+    test_ptrs[idx] = kmalloc(size);
+
+    uart_printf("[*] ptrs[%d]: %llx\r\n", idx + 1, test_ptrs[idx]);
+}
+
+static void cmd_free(char *sidx)
+{
+    int idx = atoi(sidx);
+
+    if (idx == 0) {
+        return;
+    }
+
+    idx -= 1;
+
+    if (!test_ptrs_inused[idx]) {
+        return;
+    }
+
+    test_ptrs_inused[idx] = 0;
+
+    kfree(test_ptrs[idx]);
 }
 
 static void cmd_help(void)
 {
     uart_printf(
-                "alloc <size>\t: "   "test simple allocator" "\r\n"
+                "alloc <size>\t: "   "test allocator" "\r\n"
                 "cat <filename>\t: " "get file content"  "\r\n"
                 "exec <filename>\t: " "execute file"  "\r\n"
+                "free <idx>\t: " "test allocator"  "\r\n"
                 "help\t: "   "print this help menu" "\r\n"
                 "hello\t: "  "print Hello World!"   "\r\n"
                 "hwinfo\t: " "print hardware info"  "\r\n"
@@ -74,10 +123,16 @@ static void cmd_setTimeout(char *msg, char *ssec)
     char *m;
 
     len = strlen(msg) + 1;
-    m = early_malloc(len);
+    m = kmalloc(len);
+
+    if (!m) {
+        return;
+    }
+
     memncpy(m, msg, len);
 
-    timer_add_proc((void (*)(void *))uart_printf, m, atoi(ssec));
+    uart_printf("[*] time: %d\r\n", atoi(ssec));
+    timer_add_proc((void (*)(void *))timeout_print, m, atoi(ssec));
 }
 
 static void cmd_sw_timer(void)
@@ -117,10 +172,16 @@ static void cmd_exec(char *filename)
         return;
     }
 
-    // TODO: Set stack of user program properly
-    user_sp = (char *)0xf000000;
+    user_sp = kmalloc(PAGE_SIZE);
+
+    if (user_sp == NULL) {
+        kfree(mem);
+        return;
+    }
 
     exec_user_prog(mem, user_sp);
+
+    // TODO: Free user_sp and mem
 }
 
 static void cmd_parsedtb(void)
@@ -143,6 +204,10 @@ static void shell(void)
         if (!strncmp("alloc", shell_buf, 5)) {
             if (cmd_len >= 7) {
                 cmd_alloc(&shell_buf[6]);
+            }
+        } else if (!strncmp("free", shell_buf, 4)) {
+            if (cmd_len >= 6) {
+                cmd_free(&shell_buf[5]);
             }
         } else if (!strcmp("help", shell_buf)) {
             cmd_help();

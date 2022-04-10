@@ -7,4 +7,8 @@
 
 void mm_init(void);
 
+void *kmalloc(int size);
+
+void kfree(void *ptr);
+
 #endif /* _MM_H */

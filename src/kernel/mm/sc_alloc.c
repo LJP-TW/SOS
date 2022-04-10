@@ -25,7 +25,8 @@ uint32 sc_sizes[] = {
 };
 
 typedef struct {
-    uint8 size_idx;
+    uint8 size_idx:7;
+    uint8 splitted:1;
 } sc_frame_ent;
 
 typedef struct {
@@ -56,6 +57,10 @@ static uint8 find_size_idx(int size)
 void sc_early_init(void)
 {
     sc_frame_ents = early_malloc(sizeof(sc_frame_ent) * frame_ents_size);
+
+    for (int i = 0; i < frame_ents_size; ++i) {
+        sc_frame_ents[i].splitted = 0;
+    }
 }
 
 void sc_init(void)
@@ -85,6 +90,7 @@ void *sc_alloc(int size)
 
         frame_idx = addr2idx(page);
         sc_frame_ents[frame_idx].size_idx = size_idx;
+        sc_frame_ents[frame_idx].splitted = 1;
 
         for (int i = 0;
              i + sc_sizes[size_idx] <= PAGE_SIZE;
@@ -112,12 +118,18 @@ void *sc_alloc(int size)
     return hdr;
 }
 
-void sc_free(void *sc)
+int sc_free(void *sc)
 {
     sc_hdr *hdr;
     int frame_idx, size_idx;
 
     frame_idx = addr2idx(sc);
+
+    if (!sc_frame_ents[frame_idx].splitted) {
+        /* This frame isn't managed by the Small Chunk allocator */
+        return -1;
+    }
+
     size_idx = sc_frame_ents[frame_idx].size_idx;
 
     hdr = (sc_hdr *)sc;
@@ -128,6 +140,8 @@ void sc_free(void *sc)
                 sc,
                 sc_sizes[size_idx]);
 #endif
+
+    return 0;
 }
 
 #ifdef DEBUG

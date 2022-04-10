@@ -1,7 +1,7 @@
 #include <cpio.h>
 #include <mini_uart.h>
 #include <string.h>
-#include <mm/early_alloc.h>
+#include <mm/mm.h>
 #include <utils.h>
 #include <fdt.h>
 
@@ -164,8 +164,7 @@ char *cpio_load_prog(char *cpio, char *filename)
 
         if (!strcmp(filename, curfilename)) {
             // Found it!
-            // TODO: update early_malloc
-            char *mem = (char *)early_malloc(filesize);
+            char *mem = (char *)kmalloc(filesize);
             memncpy(mem, curcontent, filesize);
             return mem;
         }

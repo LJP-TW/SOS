@@ -9,7 +9,10 @@ void sc_init(void);
 
 void *sc_alloc(int size);
 
-void sc_free(void *sc);
+/*
+ * Return 0 if successful.
+ */
+int sc_free(void *sc);
 
 #ifdef DEBUG
 void sc_test(void);
