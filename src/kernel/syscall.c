@@ -2,8 +2,6 @@
 #include <syscall.h>
 #include <utils.h>
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
-
 typedef void *(*funcp)();
 
 void *syscall_test();

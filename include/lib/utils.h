@@ -3,6 +3,17 @@
 
 #include <types.h>
 
+#ifndef __ASSEMBLER__
+
+void delay(uint64 cnt);
+void put32(uint64 addr, uint32 val);
+uint32 get32(uint64 addr);
+
+void memzero(char *src, unsigned long n);
+void memncpy(char *dst, char *src, unsigned long n);
+
+#endif /* __ASSEMBLER__ */
+
 // Reference from https://elixir.bootlin.com/linux/latest/source/tools/lib/perf/mmap.c#L299
 #define read_sysreg(r) ({                       \
     uint64 __val;                               \
@@ -17,10 +28,6 @@
              : : "rZ" (__val));    \
 } while (0)
 
-void delay(uint64 cnt);
-void put32(uint64 addr, uint32 val);
-uint32 get32(uint64 addr);
-
 #define enable_interrupt() do {       \
     asm volatile("msr DAIFClr, 0xf"); \
 } while (0)
@@ -31,5 +38,11 @@ uint32 get32(uint64 addr);
 
 #define get_elem_idx(elem, array) \
     (((char *)elem - (char *)array) / sizeof(array[0]))
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
+
+#define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
+
+#define TO_CHAR_PTR(a) ((char *)(uint64)(a))
 
 #endif  /* _UTILS_H */

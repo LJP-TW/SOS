@@ -1,6 +1,4 @@
 // Reference: https://github.com/s-matyukevich/raspberry-pi-os
-#include "mm.h"
-
 .section ".text.boot"
 
 .globl _start

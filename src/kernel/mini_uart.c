@@ -130,10 +130,10 @@ void uart_sendn(char *str, int n)
     }
 }
 
-static void uart_send_string(const char *str)
+static void uart_send_string(sendfp _send_fp, const char *str)
 {
     for (int i = 0; str[i] != '\0'; i++) {
-        (uart_send_fp)(str[i]);
+        (_send_fp)(str[i]);
     }
 }
 
@@ -142,7 +142,7 @@ static void uart_send_string(const char *str)
  * @num: output number 
  * @base: 10 or 16
  */
-static void uart_send_num(int64 num, int base, int type)
+static void uart_send_num(sendfp _send_fp, int64 num, int base, int type)
 {
     static const char digits[16] = "0123456789ABCDEF";
     char tmp[66];
@@ -150,7 +150,7 @@ static void uart_send_num(int64 num, int base, int type)
 
     if (type | SIGN) {
         if (num < 0) {
-            (uart_send_fp)('-');
+            (_send_fp)('-');
         }
     }
 
@@ -167,24 +167,21 @@ static void uart_send_num(int64 num, int base, int type)
     }
 
     while (--i >= 0) {
-        (uart_send_fp)(tmp[i]);
+        (_send_fp)(tmp[i]);
     }
 }
 
 // Ref: https://elixir.bootlin.com/linux/v3.5/source/arch/x86/boot/printf.c#L115
-void uart_printf(char *fmt, ...)
+static void _uart_printf(sendfp _send_fp, char *fmt, va_list args)
 {
     const char *s;
     char c;
     uint64 num;
     char width;
 
-    va_list args;
-    va_start(args, fmt);
-
     for (; *fmt; ++fmt) {
         if (*fmt != '%') {
-            (uart_send_fp)(*fmt);
+            (_send_fp)(*fmt);
             continue;
         }
 
@@ -200,7 +197,7 @@ void uart_printf(char *fmt, ...)
         switch (*fmt) {
         case 'c':
             c = va_arg(args, uint32) & 0xff;
-            (uart_send_fp)(c);
+            (_send_fp)(c);
             continue;
         case 'd':
             if (width) {
@@ -208,11 +205,11 @@ void uart_printf(char *fmt, ...)
             } else {
                 num = va_arg(args, int32);
             }
-            uart_send_num(num, 10, SIGN);
+            uart_send_num(_send_fp, num, 10, SIGN);
             continue;
         case 's':
             s = va_arg(args, char *);
-            uart_send_string(s);
+            uart_send_string(_send_fp, s);
             continue;
         case 'x':
             if (width) {
@@ -220,10 +217,30 @@ void uart_printf(char *fmt, ...)
             } else {
                 num = va_arg(args, uint32);
             }
-            uart_send_num(num, 16, 0);
+            uart_send_num(_send_fp, num, 16, 0);
             continue;
         }
     }
+}
+
+void uart_printf(char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    _uart_printf(uart_send_fp, fmt, args);
+
+    va_end(args);
+}
+
+void uart_sync_printf(char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    _uart_printf(uart_sync_send, fmt, args);
+
+    va_end(args);
 }
 
 void uart_init(void)

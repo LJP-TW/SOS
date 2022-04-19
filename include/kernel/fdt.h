@@ -10,6 +10,8 @@ struct fdt_property;
 
 typedef int (*fdt_parser)(int level, char *cur, char *dt_strings);
 
+extern char *fdt_base;
+
 void fdt_traversal(char *dtb);
 void parse_dtb(char *dtb, fdt_parser parser);
 
