@@ -172,12 +172,15 @@ static void cmd_exec(char *filename)
         return;
     }
 
+    // Modify user stack to the bottom of page
     user_sp = kmalloc(PAGE_SIZE);
 
     if (user_sp == NULL) {
         kfree(mem);
         return;
     }
+
+    user_sp += PAGE_SIZE - 0x8;
 
     exec_user_prog(mem, user_sp);
 
