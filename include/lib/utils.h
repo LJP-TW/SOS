@@ -36,6 +36,21 @@ void memncpy(char *dst, char *src, unsigned long n);
     asm volatile("msr DAIFSet, 0xf"); \
 } while (0)
 
+static inline uint32 save_and_disable_interrupt(void)
+{
+    uint32 daif;
+
+    daif = read_sysreg(DAIF);
+    disable_interrupt();
+
+    return daif;
+}
+
+static inline void restore_interrupt(uint32 daif)
+{
+    write_sysreg(DAIF, daif);
+}
+
 #define get_elem_idx(elem, array) \
     (((char *)elem - (char *)array) / sizeof(array[0]))
 

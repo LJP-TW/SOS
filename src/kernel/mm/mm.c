@@ -96,11 +96,10 @@ void mm_init(void)
 
 void *kmalloc(int size)
 {
-    uint64 daif;
+    uint32 daif;
     void *ret;
 
-    daif = read_sysreg(DAIF);
-    disable_interrupt();
+    daif = save_and_disable_interrupt();
 
     if (size <= PAGE_SIZE) {
         // Use the Small Chunk allocator
@@ -112,17 +111,16 @@ void *kmalloc(int size)
         ret = alloc_pages(page_cnt);
     }
 
-    write_sysreg(DAIF, daif);
+    restore_interrupt(daif);
 
     return ret;
 }
 
 void kfree(void *ptr)
 {
-    uint64 daif;
+    uint32 daif;
 
-    daif = read_sysreg(DAIF);
-    disable_interrupt();
+    daif = save_and_disable_interrupt();
 
     if (!sc_free(ptr)) {
         /*
@@ -136,5 +134,5 @@ void kfree(void *ptr)
 
 _KFREE_END:
 
-    write_sysreg(DAIF, daif);
+    restore_interrupt(daif);
 }

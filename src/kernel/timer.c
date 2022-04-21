@@ -59,23 +59,22 @@ static void timer_disable()
 
 static timer_proc *tp_alloc()
 {
-    uint64 daif;
+    uint32 daif;
     uint32 idx;
 
-    daif = read_sysreg(DAIF);
-    disable_interrupt();
+    daif = save_and_disable_interrupt();
 
     idx = ffs(t_status);
 
     if (idx == 0) {
-        write_sysreg(DAIF, daif);
+        restore_interrupt(daif);
 
         return NULL;
     }
 
     t_status &= ~(1 << (idx - 1));
 
-    write_sysreg(DAIF, daif);
+    restore_interrupt(daif);
 
     return &t_procs[idx - 1];
 }
@@ -118,12 +117,11 @@ static void timer_update_remain_time()
  */
 static int tp_insert(timer_proc *tp)
 {
-    uint64 daif;
+    uint32 daif;
     timer_proc *iter;
     int first;
 
-    daif = read_sysreg(DAIF);
-    disable_interrupt();
+    daif = save_and_disable_interrupt();
 
     // Update remain_time
     timer_update_remain_time();
@@ -141,7 +139,7 @@ static int tp_insert(timer_proc *tp)
 
     t_meta.size += 1;
 
-    write_sysreg(DAIF, daif);
+    restore_interrupt(daif);
 
     return first;
 }
@@ -151,14 +149,14 @@ static int tp_insert(timer_proc *tp)
  */
 static void timer_set()
 {
-    uint64 daif;
+    uint32 daif;
     timer_proc *tp;
 
-    daif = read_sysreg(DAIF);
-    disable_interrupt();
+    daif = save_and_disable_interrupt();
 
     if (!t_meta.size) {
-        write_sysreg(DAIF, daif);
+        restore_interrupt(daif);
+
         return;
     }
     
@@ -168,7 +166,7 @@ static void timer_set()
     t_interval = tp->remain_time;
     write_sysreg(cntp_tval_el0, t_interval);
 
-    write_sysreg(DAIF, daif);
+    restore_interrupt(daif);
 }
 
 static void timer_set_boot_cnt()
