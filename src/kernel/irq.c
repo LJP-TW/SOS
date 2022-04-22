@@ -5,6 +5,8 @@
 #include <BCM2837.h>
 #include <list.h>
 #include <bitops.h>
+#include <sched.h>
+#include <current.h>
 
 #define IRQ_TASK_NUM 32
 
@@ -41,6 +43,8 @@ struct list_head irq_tasks_meta;
  * If n-th bit is 0, it means irq_tasks[n] is unavailable.
  */
 uint32 irq_tasks_status;
+
+uint32 irq_nested_layer;
 
 /*
  * Interrupts must be disabled before calling this function.
@@ -175,7 +179,10 @@ void irq_init()
 /*
  * Interrupts must be disabled before calling this function.
  */
-int irq_add_tasks(void (*task)(void *), void *args, uint32 prio)
+int irq_run_task(void (*task)(void *),
+                 void *args,
+                 void (*fini)(void),
+                 uint32 prio)
 {
     irq_task *it;
     int preempt;
@@ -203,6 +210,8 @@ int irq_add_tasks(void (*task)(void *), void *args, uint32 prio)
         
         disable_interrupt();
 
+        (fini)();
+
         it_remove(it);
     }
 
@@ -213,9 +222,26 @@ int irq_add_tasks(void (*task)(void *), void *args, uint32 prio)
 
 void irq_handler()
 {
-    // These check functions may add irq_task.
-    timer_irq_check();
-    uart_irq_check();
+    irq_nested_layer++;
+
+    // These check functions may add irq_task and run it.
+    if (!timer_irq_check()) {}
+    else if (!uart_irq_check()) {}
+
+    irq_nested_layer--;
+
+    // IRQ handling completed
+
+    // Reschedule
+    if (irq_nested_layer || !current->need_resched) {
+        return;
+    }
+
+    enable_interrupt();
+
+    schedule();
+
+    disable_interrupt();
 }
 
 void exception_default_handler(uint32 n)

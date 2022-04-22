@@ -4,11 +4,13 @@
 #include <types.h>
 
 void timer_init();
-void timer_irq_check();
-void timer_irq_handler();
+int timer_irq_check();
 void timer_switch_info();
 
 /* Call @proc(@args) after @after seconds. */
-void timer_add_proc(void (*proc)(void *), void *args, uint32 after);
+void timer_add_proc_after(void (*proc)(void *), void *args, uint32 after);
+
+/* Call @proc(@args) after 1/@freq second. */
+void timer_add_proc_freq(void (*proc)(void *), void *args, uint32 freq);
 
 #endif /* _TIMER_H */

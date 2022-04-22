@@ -13,8 +13,7 @@ void uart_printf(char *fmt, ...);
 
 void uart_sync_printf(char *fmt, ...);
 
-void uart_irq_check(void);
-void uart_irq_handler(void);
+int uart_irq_check(void);
 
 /* Switch asynchronous/synchronous mode for uart RW */
 int uart_switch_mode(void);

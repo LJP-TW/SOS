@@ -9,6 +9,9 @@
 #include <timer.h>
 #include <irq.h>
 #include <mm/mm.h>
+#include <sched.h>
+#include <kthread.h>
+#include <current.h>
 
 #define BUFSIZE 0x100
 
@@ -132,7 +135,7 @@ static void cmd_setTimeout(char *msg, char *ssec)
     memncpy(m, msg, len);
 
     uart_printf("[*] time: %d\r\n", atoi(ssec));
-    timer_add_proc((void (*)(void *))timeout_print, m, atoi(ssec));
+    timer_add_proc_after((void (*)(void *))timeout_print, m, atoi(ssec));
 }
 
 static void cmd_sw_timer(void)
@@ -279,6 +282,22 @@ static void shell(void)
     }
 }
 
+static void foo(void)
+{
+    for (int i = 0; i < 10; ++i) {
+        uart_sync_printf("Thread id: %d %d\r\n", current->tid, i);
+        delay(1000000);
+        schedule();
+    }
+}
+
+static void idle(void)
+{
+    while (1) {
+        schedule();
+    }
+}
+
 void start_kernel(char *fdt)
 {
     fdt_base = fdt;
@@ -295,10 +314,21 @@ void start_kernel(char *fdt)
 
     timer_init();
 
+    scheduler_init();
+
+    kthread_set_init();
+    kthread_create(shell);
+
+    for (int i = 0; i < 3; ++i) {
+        kthread_create(foo);
+    }
+
+    uart_sync_printf("[*] Go!\r\n");
+
     // Enable interrupt from Auxiliary peripherals
     irq1_enable(29);
 
     enable_interrupt();
 
-    shell();
+    idle();
 }

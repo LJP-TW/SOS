@@ -8,7 +8,10 @@ void irq_init();
 /*
  * On success, 0 is returned
  */
-int irq_add_tasks(void (*task)(void *), void *args, uint32 prio);
+int irq_run_task(void (*task)(void *),
+                 void *args,
+                 void (*fini)(void),
+                 uint32 prio);
 
 void irq_handler();
 void exception_default_handler(uint32 n);

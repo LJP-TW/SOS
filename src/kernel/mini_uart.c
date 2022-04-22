@@ -9,6 +9,9 @@
 
 #define BUFSIZE 0x100
 
+static void uart_irq_handler(void *);
+static void uart_irq_fini(void);
+
 // UART asynchronous/synchronous mode
 // 0: Synchronous mode
 // 1: Asynchronous mode
@@ -275,27 +278,27 @@ void uart_init(void)
     uart_send_fp = uart_sync_send;
 }
 
-void uart_irq_check(void)
+int uart_irq_check(void)
 {
     uint32 iir = get32(AUX_MU_IIR_REG);
 
     if (iir & 0x01) {
         // No interrupt
-        return;
+        return 0;
     }
 
     // Disable RW interrupt
     put32(AUX_MU_IER_REG, 0);
-    if (irq_add_tasks((void (*)(void *))uart_irq_handler, NULL, 1)) {
+    if (irq_run_task(uart_irq_handler, NULL, uart_irq_fini, 1)) {
         put32(AUX_MU_IER_REG, 0x03);
     }
+
+    return 1;
 }
 
-void uart_irq_handler(void)
+static void uart_irq_handler(void *_)
 {
     uint32 iir = get32(AUX_MU_IIR_REG);
-    uint32 ier = get32(AUX_MU_IER_REG);
-    ier = ier & ~(0x03);
 
     if (iir & 0x02) {
         // Transmit holding register empty
@@ -310,6 +313,12 @@ void uart_irq_handler(void)
             r_tail = (r_tail + 1) % BUFSIZE;
         }
     }
+}
+
+static void uart_irq_fini(void)
+{
+    uint32 ier = get32(AUX_MU_IER_REG);
+    ier = ier & ~(0x03);
 
     // Set RW interrupt
     if (r_head != (r_tail + 1) % BUFSIZE) {
