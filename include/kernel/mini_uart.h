@@ -8,10 +8,10 @@ void uart_init(void);
 char uart_recv(void);
 uint32 uart_recv_uint(void);
 void uart_send(char c);
-void uart_sendn(char *str, int n);
-void uart_printf(char *fmt, ...);
+void uart_sendn(const char *str, int n);
+void uart_printf(const char *fmt, ...);
 
-void uart_sync_printf(char *fmt, ...);
+void uart_sync_printf(const char *fmt, ...);
 
 int uart_irq_check(void);
 

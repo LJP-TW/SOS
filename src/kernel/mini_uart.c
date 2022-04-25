@@ -126,7 +126,7 @@ uint32 uart_recvline(char *buff, int maxlen)
     return cnt;
 }
 
-void uart_sendn(char *str, int n)
+void uart_sendn(const char *str, int n)
 {
     while (n--) {
         (uart_send_fp)(*str++);
@@ -175,7 +175,7 @@ static void uart_send_num(sendfp _send_fp, int64 num, int base, int type)
 }
 
 // Ref: https://elixir.bootlin.com/linux/v3.5/source/arch/x86/boot/printf.c#L115
-static void _uart_printf(sendfp _send_fp, char *fmt, va_list args)
+static void _uart_printf(sendfp _send_fp, const char *fmt, va_list args)
 {
     const char *s;
     char c;
@@ -226,7 +226,7 @@ static void _uart_printf(sendfp _send_fp, char *fmt, va_list args)
     }
 }
 
-void uart_printf(char *fmt, ...)
+void uart_printf(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -236,7 +236,7 @@ void uart_printf(char *fmt, ...)
     va_end(args);
 }
 
-void uart_sync_printf(char *fmt, ...)
+void uart_sync_printf(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);

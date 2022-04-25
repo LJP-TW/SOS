@@ -42,27 +42,28 @@ static inline void pt_regs_init(struct pt_regs *regs)
 // TODO: Add argv & envp
 void exec_user_prog(char *filename)
 {
+    void *data;
     task_struct *task;
     
+    data = cpio_load_prog(initramfs_base, filename);
+
+    if (data == NULL) {
+        goto EXEC_USER_PROG_END;
+    }
+
     task = task_create();
 
     task->kernel_stack = kmalloc(STACK_SIZE);
     task->user_stack = kmalloc(STACK_SIZE);
-    task->data = cpio_load_prog(initramfs_base, filename);
-
-    if (task->data == NULL) {
-        goto EXEC_USER_PROG_END;
-    }
+    task->data = data;
 
     task->regs.sp = (char *)task->kernel_stack + STACK_SIZE - 0x10;
     pt_regs_init(&task->regs);
 
     sched_add_task(task);
 
-    return;
-
 EXEC_USER_PROG_END:
-    task_free(task);
+    return;
 }
 
 void exit_user_prog(void)
