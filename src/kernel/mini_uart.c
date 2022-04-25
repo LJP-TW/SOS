@@ -88,6 +88,13 @@ void uart_send(char c)
     (uart_send_fp)(c);
 }
 
+void uart_recvn(char *buff, int n)
+{
+    while (n--) {
+        *buff++ = (uart_recv_fp)();
+    }
+}
+
 uint32 uart_recv_uint(void)
 {
     char buf[4];

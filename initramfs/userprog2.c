@@ -3,6 +3,7 @@
 typedef unsigned long long int uint64;
 
 #define SYS_GETPID      0
+#define SYS_UART_RECV   1
 #define SYS_UART_WRITE  2
 #define SYS_EXIT        5
 
@@ -50,6 +51,11 @@ void exit(void)
     syscall(SYS_EXIT, 0, 0, 0, 0, 0, 0);
 }
 
+void uart_recv(const char buf[], size_t size)
+{
+    syscall(SYS_UART_RECV, (void *)buf, (void *)size, 0, 0, 0, 0);
+}
+
 void uart_write(const char buf[], size_t size)
 {
     syscall(SYS_UART_WRITE, (void *)buf, (void *)size, 0, 0, 0, 0);
@@ -77,6 +83,12 @@ int start(void)
     buf2[idx+1] = '\n';
 
     uart_write(buf2, idx+2);
+
+    uart_recv(buf1, 8);
+    
+    uart_write("[User] buf1: ", 13);
+    uart_write(buf1, 8);
+    uart_write("\r\n", 2);
 
     exit();
 

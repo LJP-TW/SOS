@@ -6,6 +6,7 @@
 uint32 uart_recvline(char *buff, int maxlen);
 void uart_init(void);
 char uart_recv(void);
+void uart_recvn(char *buff, int n);
 uint32 uart_recv_uint(void);
 void uart_send(char c);
 void uart_sendn(const char *str, int n);

@@ -74,7 +74,7 @@ void syscall_getpid(trapframe *frame)
 
 void syscall_uart_read(trapframe *_, char buf[], size_t size)
 {
-    // TODO
+    uart_recvn(buf, size);
 }
 
 void syscall_uart_write(trapframe *_, const char buf[], size_t size)
