@@ -29,6 +29,15 @@ static void timeout_print(char *str)
     kfree(str);
 }
 
+static void foo(void)
+{
+    for (int i = 0; i < 10; ++i) {
+        uart_sync_printf("Thread id: %d %d\r\n", current->tid, i);
+        delay(1000000);
+        schedule();
+    }
+}
+
 static void cmd_alloc(char *ssize)
 {
     int size, idx;
@@ -92,6 +101,7 @@ static void cmd_help(void)
                     "print @msg after @sec seconds" "\r\n"
                 "sw_timer\t: " "turn on/off timer debug info" "\r\n"
                 "sw_uart_mode\t: " "use sync/async UART" "\r\n"
+                "thread_test\t: " "test kthread" "\r\n"
             );
 }
 
@@ -195,6 +205,13 @@ static void cmd_parsedtb(void)
     fdt_traversal(fdt_base);
 }
 
+static void cmd_thread_test(void)
+{
+    for (int i = 0; i < 3; ++i) {
+        kthread_create(foo);
+    }
+}
+
 static int shell_read_cmd(void)
 {
     return uart_recvline(shell_buf, BUFSIZE);
@@ -267,6 +284,8 @@ static void shell(void)
             cmd_ls();
         } else if (!strcmp("parsedtb", shell_buf)) {
             cmd_parsedtb();
+        } else if (!strcmp("thread_test", shell_buf)) {
+            cmd_thread_test();
         } else if (!strncmp("cat", shell_buf, 3)) {
             if (cmd_len >= 5) {
                 cmd_cat(&shell_buf[4]);
@@ -282,18 +301,10 @@ static void shell(void)
     }
 }
 
-static void foo(void)
-{
-    for (int i = 0; i < 10; ++i) {
-        uart_sync_printf("Thread id: %d %d\r\n", current->tid, i);
-        delay(1000000);
-        schedule();
-    }
-}
-
 static void idle(void)
 {
     while (1) {
+        kthread_kill_zombies();
         schedule();
     }
 }
@@ -303,27 +314,17 @@ void start_kernel(char *fdt)
     fdt_base = fdt;
 
     irq_init();
-
     uart_init();
-    uart_printf("[*] fdt base: %x\r\n", fdt_base);
-    uart_printf("[*] Kernel\r\n");
-    
     initramfs_init();
-
     mm_init();
-
     timer_init();
-
     scheduler_init();
+    kthread_init();
 
-    kthread_set_init();
+    uart_printf("[*] fdt base: %x\r\n", fdt_base);
+    uart_printf("[*] Kernel start!\r\n");
+
     kthread_create(shell);
-
-    for (int i = 0; i < 3; ++i) {
-        kthread_create(foo);
-    }
-
-    uart_sync_printf("[*] Go!\r\n");
 
     // Enable interrupt from Auxiliary peripherals
     irq1_enable(29);

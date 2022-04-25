@@ -233,7 +233,7 @@ void irq_handler()
     // IRQ handling completed
 
     // Reschedule
-    if (irq_nested_layer || !current->need_resched) {
+    if (irq_nested_layer || !current->need_resched || current->preempt) {
         return;
     }
 

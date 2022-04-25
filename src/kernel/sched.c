@@ -3,6 +3,7 @@
 #include <timer.h>
 #include <current.h>
 #include <list.h>
+#include <preempt.h>
 
 #define SCHEDULER_TIMER_HZ 1000
 #define SCHEDULER_WATERMARK 15
@@ -41,6 +42,7 @@ void schedule(void)
 
     restore_interrupt(daif);
 
+    // Set registers. Set current to task
     switch_to(current, task);
 }
 
@@ -57,11 +59,18 @@ void schedule_tick(void)
 
 void sched_add_task(task_struct *task)
 {
-    uint32 daif;
-
-    daif = save_and_disable_interrupt();
+    preempt_disable();
 
     list_add_tail(&task->list, &run_queue);
 
-    restore_interrupt(daif);
+    preempt_enable();
+}
+
+void sched_del_task(task_struct *task)
+{
+    preempt_disable();
+
+    list_del(&task->list);
+
+    preempt_enable();
 }

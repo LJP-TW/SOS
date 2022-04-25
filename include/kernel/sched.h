@@ -27,6 +27,7 @@ typedef struct _task_struct {
     struct list_head list;
     uint32 need_resched:1;
     uint32 tid;
+    uint32 preempt;
 } task_struct;
 
 void switch_to(task_struct *from, task_struct *to);
@@ -38,5 +39,7 @@ void schedule(void);
 void schedule_tick(void);
 
 void sched_add_task(task_struct *task);
+
+void sched_del_task(task_struct *task);
 
 #endif /* _SCHED_H */
