@@ -130,15 +130,15 @@ set_exception_vector_table:
   str x30, [sp, 16 * 15]
   .endif
 
-  mrs x0, elr_el\el
-  mrs x1, spsr_el\el
+  mrs x0, elr_el1
+  mrs x1, spsr_el1
   stp x0, x1, [sp, 16 * 16]
 .endm
 
 .macro kernel_exit el
   ldp x0, x1, [sp, 16 * 16]
-  msr elr_el\el, x0
-  msr spsr_el\el, x1
+  msr elr_el1, x0
+  msr spsr_el1, x1
 
   .if \el ==0
   ldp x30, x0, [sp, 16 * 15]
@@ -178,33 +178,20 @@ exception_handler:
   eret
 
 l64_syn_eh:
-  save_all
-  save_exception_reg
+  kernel_entry 0
 
-  // Get exception class ({EC[31:26]})
-  mrs x0, esr_el1
-  asr x1, x0, 26
-
-  // SVC instruction execution
-  cmp x1, 0x15
-  bne l64_syn_eh_end
-
+  mov x0, sp
+  mrs x1, esr_el1
   bl syscall_handler
 
-l64_syn_eh_end:
-  load_exception_reg
-  load_all
-  eret
+  kernel_exit 0
 
 l64_irq_eh:
-  save_all
-  save_exception_reg
+  kernel_entry 0
 
   bl irq_handler
 
-  load_exception_reg
-  load_all
-  eret
+  kernel_exit 0
 
 curr_syn_eh:
   save_all

@@ -1,7 +1,7 @@
 #ifndef _WAITQUEUE_H
 #define _WAITQUEUE_H
 
-#include <sched.h>
+#include <task.h>
 
 typedef struct {
     struct list_head list;

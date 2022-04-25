@@ -1,7 +1,7 @@
-// See include/kernel/exec.h for function declaration
+// See include/kernel/exec.c for function declaration
 
-.globl exec_user_prog
-exec_user_prog:
+.globl enter_el0_run_user_prog
+enter_el0_run_user_prog:
     // Set exception return address
     msr elr_el1, x0
 

@@ -1,5 +1,5 @@
 #include <preempt.h>
-#include <sched.h>
+#include <task.h>
 #include <current.h>
 
 void preempt_disable(void)
