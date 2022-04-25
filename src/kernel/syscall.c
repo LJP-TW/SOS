@@ -5,6 +5,7 @@
 #include <current.h>
 #include <task.h>
 #include <mini_uart.h>
+#include <rpi3.h>
 
 typedef void (*syscall_funcp)();
 
@@ -99,7 +100,7 @@ void syscall_exit(trapframe *_)
 
 void syscall_mbox_call(trapframe *_, unsigned char ch, unsigned int *mbox)
 {
-    // TODO
+    mailbox_call(ch, mbox);
 }
 
 void syscall_kill_pid(trapframe *_, int pid)

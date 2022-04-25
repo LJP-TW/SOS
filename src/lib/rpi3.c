@@ -40,11 +40,11 @@
 // Aligned buffer
 static unsigned int __attribute__((aligned(0x10))) mailbox[16];
 
-static void mailbox_call(void)
+void mailbox_call(unsigned char channel, unsigned int *mb)
 {
     // Write the data (shifted into the upper 28 bits) combined with 
     // the channel (in the lower four bits) to the write register.
-    unsigned int r = (((unsigned long)mailbox) & ~0xf) | MAILBOX_CH_PROP;
+    unsigned int r = (((unsigned long)mb) & ~0xf) | channel;
 
     // Check if Mailbox 0 status register’s full flag is set.
     while ((get32(MAILBOX_STATUS) & MAILBOX_FULL)) {};
@@ -76,7 +76,7 @@ unsigned int get_board_revision(void)
     // Tags end
     mailbox[6] = END_TAG;
 
-    mailbox_call(); // Message passing procedure call
+    mailbox_call(MAILBOX_CH_PROP, mailbox); // Message passing procedure call
 
     return mailbox[5]; 
 }
@@ -94,7 +94,7 @@ void get_arm_memory(struct arm_memory_info *info)
     // Tags end
     mailbox[7] = END_TAG;
 
-    mailbox_call(); // Message passing procedure call
+    mailbox_call(MAILBOX_CH_PROP, mailbox); // Message passing procedure call
 
     info->baseaddr = mailbox[5];
     info->size     = mailbox[6];
