@@ -305,7 +305,12 @@ void start_kernel(char *fdt)
     uart_printf("[*] fdt base: %x\r\n", fdt_base);
     uart_printf("[*] Kernel start!\r\n");
 
-    kthread_create(shell);
+    // TODO: Remove shell?
+    // kthread_create(shell);
+
+    // TODO: Add argv & envp
+    // First user program
+    sched_new_user_prog("syscall.img");
 
     // Enable interrupt from Auxiliary peripherals
     irq1_enable(29);

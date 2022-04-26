@@ -195,6 +195,8 @@ static void timer_show_boot_time(void *_)
 
 void timer_init()
 {
+    uint64 cntkctl_el1;
+
     timer_set_boot_cnt();
 
     INIT_LIST_HEAD(&t_meta.head);
@@ -202,6 +204,11 @@ void timer_init()
 
     t_interval = 0;
     t_status = 0xffffffff;
+
+    // Allow EL0 to access timer
+    cntkctl_el1 = read_sysreg(CNTKCTL_EL1);
+    cntkctl_el1 |= 1;
+    write_sysreg(CNTKCTL_EL1, cntkctl_el1);
 
     timer_add_proc_after(timer_show_boot_time, NULL, 2);
 }
