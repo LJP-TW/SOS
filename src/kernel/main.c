@@ -177,7 +177,7 @@ static void cmd_cat(char *filename)
 static void cmd_exec(char *filename)
 {
     // TODO: Add argv & envp
-    exec_user_prog(filename);
+    sched_new_user_prog(filename);
 }
 
 static void cmd_parsedtb(void)

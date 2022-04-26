@@ -5,8 +5,6 @@
 #include <waitqueue.h>
 #include <preempt.h>
 
-#define STACK_SIZE (2 * PAGE_SIZE)
-
 static wait_queue_head *wait_queue;
 
 static void kthread_start(void)

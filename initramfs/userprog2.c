@@ -16,6 +16,7 @@ typedef char int8;
 #define SYS_GETPID      0
 #define SYS_UART_RECV   1
 #define SYS_UART_WRITE  2
+#define SYS_EXEC        3
 #define SYS_EXIT        5
 #define SYS_MBOX_CALL   6
 #define SYS_KILL_PID    7
@@ -57,11 +58,6 @@ int getpid()
 {
     int pid = syscall(SYS_GETPID, 0, 0, 0, 0, 0, 0);
     return pid;
-}
-
-void exit(void)
-{
-    syscall(SYS_EXIT, 0, 0, 0, 0, 0, 0);
 }
 
 void uart_recv(const char buf[], size_t size)
@@ -176,6 +172,16 @@ void uart_printf(const char *fmt, ...)
     va_end(args);
 }
 
+void exec(const char *name, char *const argv[])
+{
+    syscall(SYS_EXEC, (void *)name, (void *)argv, 0, 0, 0, 0);
+}
+
+void exit(void)
+{
+    syscall(SYS_EXIT, 0, 0, 0, 0, 0, 0);
+}
+
 void mbox_call(unsigned char ch, unsigned int *mbox)
 {
     syscall(SYS_MBOX_CALL, (void *)(uint64)ch, mbox, 0, 0, 0, 0);
@@ -252,7 +258,7 @@ int start(void)
 
     uart_printf("revision: %x\r\n", revision);
 
-    exit();
+    exec("userprog1", NULL);
 
     return 0;
 }

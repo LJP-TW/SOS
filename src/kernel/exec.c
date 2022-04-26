@@ -6,8 +6,6 @@
 #include <kthread.h>
 #include <mm/mm.h>
 
-#define STACK_SIZE (2 * PAGE_SIZE)
-
 // Change current EL to EL0 and execute the user program at @entry
 // Set user stack to @user_sp
 void enter_el0_run_user_prog(void *entry, char *user_sp);
@@ -40,7 +38,7 @@ static inline void pt_regs_init(struct pt_regs *regs)
 }
 
 // TODO: Add argv & envp
-void exec_user_prog(char *filename)
+void sched_new_user_prog(char *filename)
 {
     void *data;
     task_struct *task;

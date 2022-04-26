@@ -4,6 +4,8 @@
 #include <types.h>
 #include <list.h>
 
+#define STACK_SIZE (2 * PAGE_SIZE)
+
 /* Task status */
 #define TASK_NEW        0
 #define TASK_RUNNING    1

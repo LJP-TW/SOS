@@ -16,7 +16,7 @@ void cpio_cat(char *cpio, char *filename);
  *
  * Return NULL if failed.
  */
-char *cpio_load_prog(char *cpio, char *filename);
+char *cpio_load_prog(char *cpio, const char *filename);
 
 void initramfs_init(void);
 

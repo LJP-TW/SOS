@@ -8,6 +8,8 @@
 #include <rpi3.h>
 #include <preempt.h>
 #include <kthread.h>
+#include <cpio.h>
+#include <mm/mm.h>
 
 typedef void (*syscall_funcp)();
 
@@ -85,9 +87,30 @@ void syscall_uart_write(trapframe *_, const char buf[], size_t size)
     uart_sendn(buf, size);
 }
 
+// TODO: Passing argv
 void syscall_exec(trapframe *_, const char* name, char *const argv[])
 {
-    // TODO
+    void *data;
+    char *kernel_sp;
+    char *user_sp;
+    
+    data = cpio_load_prog(initramfs_base, name);
+
+    if (data == NULL) {
+        return;
+    }
+
+    // Use origin kernel stack
+
+    // TODO: Clear user stack
+
+    kfree(current->data);
+    current->data = data;
+
+    kernel_sp = (char *)current->kernel_stack + STACK_SIZE - 0x10;
+    user_sp = (char *)current->user_stack + STACK_SIZE - 0x10;
+
+    exec_user_prog(current->data, user_sp, kernel_sp);
 }
 
 void syscall_fork(trapframe *_)
