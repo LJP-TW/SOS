@@ -17,6 +17,7 @@ typedef char int8;
 #define SYS_UART_RECV   1
 #define SYS_UART_WRITE  2
 #define SYS_EXEC        3
+#define SYS_FORK        4
 #define SYS_EXIT        5
 #define SYS_MBOX_CALL   6
 #define SYS_KILL_PID    7
@@ -56,8 +57,7 @@ uint64 syscall(uint64 syscall_num,
 
 int getpid()
 {
-    int pid = syscall(SYS_GETPID, 0, 0, 0, 0, 0, 0);
-    return pid;
+    return (int)syscall(SYS_GETPID, 0, 0, 0, 0, 0, 0);
 }
 
 void uart_recv(const char buf[], size_t size)
@@ -177,6 +177,11 @@ void exec(const char *name, char *const argv[])
     syscall(SYS_EXEC, (void *)name, (void *)argv, 0, 0, 0, 0);
 }
 
+int fork(void)
+{
+    return (int)syscall(SYS_FORK, 0, 0, 0, 0, 0, 0);
+}
+
 void exit(void)
 {
     syscall(SYS_EXIT, 0, 0, 0, 0, 0, 0);
@@ -225,40 +230,49 @@ unsigned int get_board_revision(void)
     return mailbox[5];
 }
 
+void show_stack(void)
+{
+    uint64 sp;
+
+    asm volatile (
+        "mov x9, sp\n"
+        "str x9, %0\n"
+        : "=m" (sp)
+    );
+
+    uart_printf("[User] Stack: %llx\r\n", sp);
+}
+
 int start(void)
 {
     char buf1[0x10] = { 0 };
-    char buf2[0x10] = { 0 };
-    int pid, idx, revision;
+    int pid, revision;
     
+    pid = getpid();
+    uart_printf("[User] pid: %d\r\n", pid);
+
+    uart_printf("[User] kill_pid(2)\r\n");
     kill_pid(2);
 
-    idx = 0;
-    pid = getpid();
-
-    while (pid) {
-        buf1[idx++] = '0' + pid % 10;
-        pid /= 10;
-    }
-
-    for (int i = 0; i < idx; ++i) {
-        buf2[i] = buf1[idx - i - 1];
-    }
-
-    buf2[idx] = '\r';
-    buf2[idx+1] = '\n';
-
-    uart_write(buf2, idx+2);
-
+    uart_printf("[User] Input:\r\n");
     uart_recv(buf1, 8);
-    
-    uart_printf("[User] buf1: %s\r\n", buf1);
+    uart_printf("[User] Output: %s\r\n", buf1);
 
     revision = get_board_revision();
+    uart_printf("[User] Revision: %x\r\n", revision);
 
-    uart_printf("revision: %x\r\n", revision);
+    pid = fork();
 
-    exec("userprog1", NULL);
+    if (pid == 0) {
+        uart_printf("[User] Child: exec userprog1\r\n");
+        show_stack();
+        exec("userprog1", NULL);
+    } else {
+        uart_printf("[User] Parent: child pid: %d\r\n", pid);
+        show_stack();
+    }
 
+    uart_printf("[User] Exit\r\n");
+    exit();
     return 0;
 }

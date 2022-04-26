@@ -35,9 +35,9 @@ typedef struct {
     uint64 x28;
     uint64 x29;
     uint64 x30;
-    uint64 sp_el0;
-    uint64 elr_el1;
-    uint64 spsr_el1;
+    void *sp_el0;
+    void *elr_el1;
+    void *spsr_el1;
 } trapframe;
 
 #endif /* _TRAPFRAME_H */

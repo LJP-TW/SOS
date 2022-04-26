@@ -41,11 +41,12 @@ static inline void pt_regs_init(struct pt_regs *regs)
 void sched_new_user_prog(char *filename)
 {
     void *data;
+    uint32 datalen;
     task_struct *task;
     
-    data = cpio_load_prog(initramfs_base, filename);
+    datalen = cpio_load_prog(initramfs_base, filename, (char **)&data);
 
-    if (data == NULL) {
+    if (datalen == 0) {
         goto EXEC_USER_PROG_END;
     }
 
@@ -54,6 +55,7 @@ void sched_new_user_prog(char *filename)
     task->kernel_stack = kmalloc(STACK_SIZE);
     task->user_stack = kmalloc(STACK_SIZE);
     task->data = data;
+    task->datalen = datalen;
 
     task->regs.sp = (char *)task->kernel_stack + STACK_SIZE - 0x10;
     pt_regs_init(&task->regs);
