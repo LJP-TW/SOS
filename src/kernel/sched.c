@@ -5,8 +5,8 @@
 #include <list.h>
 #include <preempt.h>
 
-#define SCHEDULER_TIMER_HZ 1000
-#define SCHEDULER_WATERMARK 15
+#define SCHEDULER_TIMER_HZ 32
+#define SCHEDULER_WATERMARK 1
 
 static struct list_head run_queue;
 
