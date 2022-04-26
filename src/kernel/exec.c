@@ -69,4 +69,6 @@ EXEC_USER_PROG_END:
 void exit_user_prog(void)
 {
     kthread_fini();
+
+    // Never reach
 }

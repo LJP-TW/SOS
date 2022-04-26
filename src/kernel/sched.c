@@ -61,6 +61,8 @@ void sched_add_task(task_struct *task)
 {
     preempt_disable();
 
+    task->status = TASK_RUNNING;
+
     list_add_tail(&task->list, &run_queue);
 
     preempt_enable();

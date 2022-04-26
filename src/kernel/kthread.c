@@ -22,12 +22,19 @@ static void kthread_start(void)
     kthread_fini();
 }
 
+void kthread_add_wait_queue(task_struct *task)
+{
+    wq_add_task(task, wait_queue);
+}
+
 /*
  * Add to wait_queue to wait some process to recycle this kthread
  */
 void kthread_fini(void)
 {    
     preempt_disable();
+
+    current->status = TASK_DEAD;
 
     sched_del_task(current);
 
@@ -36,6 +43,8 @@ void kthread_fini(void)
     preempt_enable();
 
     schedule();
+
+    // Never reach
 }
 
 void kthread_init(void)

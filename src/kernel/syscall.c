@@ -6,6 +6,8 @@
 #include <task.h>
 #include <mini_uart.h>
 #include <rpi3.h>
+#include <preempt.h>
+#include <kthread.h>
 
 typedef void (*syscall_funcp)();
 
@@ -96,6 +98,8 @@ void syscall_fork(trapframe *_)
 void syscall_exit(trapframe *_)
 {
     exit_user_prog();
+
+    // Never reach
 }
 
 void syscall_mbox_call(trapframe *_, unsigned char ch, unsigned int *mbox)
@@ -105,7 +109,28 @@ void syscall_mbox_call(trapframe *_, unsigned char ch, unsigned int *mbox)
 
 void syscall_kill_pid(trapframe *_, int pid)
 {
-    // TODO
+    task_struct *task;
+
+    if (current->tid == pid) {
+        exit_user_prog();
+
+        // Never reach
+        return;
+    }
+
+    preempt_disable();
+
+    task = task_get_by_tid(pid);
+
+    if (!task || task->status != TASK_RUNNING) {
+        goto SYSCALL_KILL_PID_END;
+    }
+
+    list_del(&task->list);
+    kthread_add_wait_queue(task);
+
+SYSCALL_KILL_PID_END:
+    preempt_enable();
 }
 
 void syscall_signal(trapframe *_, int signal, void (*handler)(void))

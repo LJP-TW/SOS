@@ -4,6 +4,11 @@
 #include <types.h>
 #include <list.h>
 
+/* Task status */
+#define TASK_NEW        0
+#define TASK_RUNNING    1
+#define TASK_DEAD       2
+
 struct pt_regs {
     void *x19;
     void *x20;
@@ -27,13 +32,21 @@ typedef struct _task_struct {
     void *user_stack;
     /* TODO: Update to address_space */
     void *data;
+    /* @list is used by run_queue / wait_queue */
     struct list_head list;
-    uint32 need_resched:1;
+    /* @task_list links all tasks */
+    struct list_head task_list;
+    uint16 status;
+    uint16 need_resched:1;
     uint32 tid;
     uint32 preempt;
 } task_struct;
 
+void task_init(void);
+
 task_struct *task_create(void);
 void task_free(task_struct *task);
+
+task_struct *task_get_by_tid(uint32 tid);
 
 #endif /* _TASK_H */

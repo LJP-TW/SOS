@@ -18,6 +18,7 @@ typedef char int8;
 #define SYS_UART_WRITE  2
 #define SYS_EXIT        5
 #define SYS_MBOX_CALL   6
+#define SYS_KILL_PID    7
 
 int start(void) __attribute__((section(".start")));
 
@@ -180,6 +181,11 @@ void mbox_call(unsigned char ch, unsigned int *mbox)
     syscall(SYS_MBOX_CALL, (void *)(uint64)ch, mbox, 0, 0, 0, 0);
 }
 
+void kill_pid(int pid)
+{
+    syscall(SYS_KILL_PID, (void *)(uint64)pid, 0, 0, 0, 0, 0);
+}
+
 /* Channels */
 #define MAILBOX_CH_PROP    8
 
@@ -219,6 +225,8 @@ int start(void)
     char buf2[0x10] = { 0 };
     int pid, idx, revision;
     
+    kill_pid(2);
+
     idx = 0;
     pid = getpid();
 

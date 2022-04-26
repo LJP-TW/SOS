@@ -298,6 +298,7 @@ void start_kernel(char *fdt)
     initramfs_init();
     mm_init();
     timer_init();
+    task_init();
     scheduler_init();
     kthread_init();
 
