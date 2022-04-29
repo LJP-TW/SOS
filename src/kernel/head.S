@@ -184,12 +184,18 @@ l64_syn_eh:
   mrs x1, esr_el1
   bl syscall_handler
 
+  mov x0, sp
+  bl exit_to_user_mode
+
   kernel_exit 0
 
 l64_irq_eh:
   kernel_entry 0
 
   bl irq_handler
+
+  mov x0, sp
+  bl exit_to_user_mode
 
   kernel_exit 0
 

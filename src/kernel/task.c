@@ -1,4 +1,5 @@
 #include <task.h>
+#include <signal.h>
 #include <mm/mm.h>
 
 // TODO: Use rbtree to manage tasks
@@ -25,8 +26,12 @@ void task_init(void)
 task_struct *task_create(void)
 {
     task_struct *task;
+    struct signal_head_t *signal;
+    struct sighand_t *sighand;
     
     task = kmalloc(sizeof(task_struct));
+    signal = signal_head_create();
+    sighand = sighand_create();
 
     task->kernel_stack = NULL;
     task->user_stack = NULL;
@@ -37,6 +42,9 @@ task_struct *task_create(void)
     task->need_resched = 0;
     task->tid = alloc_tid();
     task->preempt = 0;
+
+    task->signal = signal;
+    task->sighand = sighand;
 
     return task;
 }
@@ -53,6 +61,9 @@ void task_free(task_struct *task)
         kfree(task->data);
 
     list_del(&task->task_list);
+
+    signal_head_free(task->signal);
+    sighand_free(task->sighand);
 
     // TODO: release tid
     

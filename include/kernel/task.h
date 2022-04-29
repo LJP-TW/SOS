@@ -11,6 +11,10 @@
 #define TASK_RUNNING    1
 #define TASK_DEAD       2
 
+/* Define in include/kernel/signal.h */
+struct signal_head_t;
+struct sighand_t;
+
 struct pt_regs {
     void *x19;
     void *x20;
@@ -43,6 +47,9 @@ typedef struct _task_struct {
     uint16 need_resched:1;
     uint32 tid;
     uint32 preempt;
+    /* Signal */
+    struct signal_head_t *signal;
+    struct sighand_t *sighand;
 } task_struct;
 
 #define SAVE_REGS(task) \

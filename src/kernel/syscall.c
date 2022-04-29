@@ -10,6 +10,7 @@
 #include <kthread.h>
 #include <cpio.h>
 #include <sched.h>
+#include <signal.h>
 #include <mm/mm.h>
 
 #define KSTACK_VARIABLE(x)                      \
@@ -37,8 +38,6 @@ void syscall_fork(trapframe *_);
 void syscall_exit(trapframe *_);
 void syscall_mbox_call(trapframe *_, unsigned char ch, unsigned int *mbox);
 void syscall_kill_pid(trapframe *_, int pid);
-void syscall_signal(trapframe *_, int signal, void (*handler)(void));
-void syscall_kill(trapframe *_, int pid, int signal);
 void syscall_show_info(trapframe *_);
 
 syscall_funcp syscall_table[] = {
@@ -53,6 +52,7 @@ syscall_funcp syscall_table[] = {
     (syscall_funcp) syscall_signal,     // 8
     (syscall_funcp) syscall_kill,
     (syscall_funcp) syscall_show_info,
+    (syscall_funcp) syscall_sigreturn,
 };
 
 typedef struct {
@@ -128,6 +128,10 @@ void syscall_exec(trapframe *_, const char* name, char *const argv[])
     kernel_sp = (char *)current->kernel_stack + STACK_SIZE - 0x10;
     user_sp = (char *)current->user_stack + STACK_SIZE - 0x10;
 
+    // Reset signal
+    signal_head_reset(current->signal);
+    sighand_reset(current->sighand);
+
     exec_user_prog(current->data, user_sp, kernel_sp);
 }
 
@@ -160,6 +164,9 @@ void syscall_fork(trapframe *frame)
     memncpy(child->kernel_stack, current->kernel_stack, STACK_SIZE);
     memncpy(child->user_stack, current->user_stack, STACK_SIZE);
     memncpy(child->data, current->data, current->datalen);
+
+    // Copy signal handler
+    sighand_copy(child->sighand, child->data);
 
     // Save regs
     SAVE_REGS(current);
@@ -227,16 +234,6 @@ void syscall_kill_pid(trapframe *_, int pid)
 
 SYSCALL_KILL_PID_END:
     preempt_enable();
-}
-
-void syscall_signal(trapframe *_, int signal, void (*handler)(void))
-{
-    // TODO
-}
-
-void syscall_kill(trapframe *_, int pid, int signal)
-{
-    // TODO
 }
 
 // Print the content of spsr_el1, elr_el1 and esr_el1
