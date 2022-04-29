@@ -185,6 +185,7 @@ void syscall_fork(trapframe *frame)
     child_frame = KSTACK_VARIABLE(frame);
 
     child_frame->x0 = 0;
+    child_frame->x30 = (uint64)DATA_VARIABLE(frame->x30);
     child_frame->sp_el0 = USTACK_VARIABLE(frame->sp_el0);
     child_frame->elr_el1 = DATA_VARIABLE(frame->elr_el1);
 
