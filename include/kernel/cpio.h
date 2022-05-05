@@ -11,12 +11,12 @@ void cpio_cat(char *cpio, char *filename);
 
 /*
  * Allocate a memory chunk and load the @filename program onto it. Then return
- * the address of the chunk. This memory chunk needs to be passed to kfree() 
- * manually.
+ * the address of the chunk by @output_data. @output_data needs to be passed 
+ * to kfree() manually.
  *
- * Return NULL if failed.
+ * Return output_data length, return 0 if no such file.
  */
-char *cpio_load_prog(char *cpio, char *filename);
+uint32 cpio_load_prog(char *cpio, const char *filename, char **output_data);
 
 void initramfs_init(void);
 

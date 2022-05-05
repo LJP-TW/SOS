@@ -89,7 +89,7 @@ $(INITRAMFS_CPIO): $(INITRAMFS_FILES)
 	cd initramfs; find . | cpio -o -H newc > ../$(INITRAMFS_CPIO)
 
 qemu: all $(INITRAMFS_CPIO) $(RPI3_DTB)
-	qemu-system-aarch64 -M raspi3 -kernel $(BOOTLOADER_IMG) -display none \
+	qemu-system-aarch64 -M raspi3 -kernel $(BOOTLOADER_IMG) \
 						-initrd $(INITRAMFS_CPIO) \
 						-dtb $(RPI3_DTB) \
 						-chardev pty,id=pty0,logfile=pty.log,signal=off \

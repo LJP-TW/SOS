@@ -10,6 +10,9 @@
 
 #define TIMER_PROC_NUM 32
 
+static void timer_irq_handler(void *);
+static void timer_irq_fini(void);
+
 typedef struct {
     // cb(args)
     void (*cb)(void *);
@@ -59,23 +62,22 @@ static void timer_disable()
 
 static timer_proc *tp_alloc()
 {
-    uint64 daif;
+    uint32 daif;
     uint32 idx;
 
-    daif = read_sysreg(DAIF);
-    disable_interrupt();
+    daif = save_and_disable_interrupt();
 
     idx = ffs(t_status);
 
     if (idx == 0) {
-        write_sysreg(DAIF, daif);
+        restore_interrupt(daif);
 
         return NULL;
     }
 
     t_status &= ~(1 << (idx - 1));
 
-    write_sysreg(DAIF, daif);
+    restore_interrupt(daif);
 
     return &t_procs[idx - 1];
 }
@@ -97,7 +99,7 @@ static void tp_release(timer_proc *tp)
 static void timer_update_remain_time()
 {
     timer_proc *iter;
-    uint32 cntp_tval_el0;
+    int32 cntp_tval_el0;
     uint32 diff;
 
     if (!t_meta.size) {
@@ -109,7 +111,11 @@ static void timer_update_remain_time()
     t_interval = cntp_tval_el0;
 
     list_for_each_entry(iter, &t_meta.head, list) {
-        iter->remain_time -= diff;
+        if (diff > iter->remain_time) {
+            iter->remain_time = 0;
+        } else {
+            iter->remain_time -= diff;
+        }
     }
 }
 
@@ -118,12 +124,11 @@ static void timer_update_remain_time()
  */
 static int tp_insert(timer_proc *tp)
 {
-    uint64 daif;
+    uint32 daif;
     timer_proc *iter;
     int first;
 
-    daif = read_sysreg(DAIF);
-    disable_interrupt();
+    daif = save_and_disable_interrupt();
 
     // Update remain_time
     timer_update_remain_time();
@@ -141,7 +146,7 @@ static int tp_insert(timer_proc *tp)
 
     t_meta.size += 1;
 
-    write_sysreg(DAIF, daif);
+    restore_interrupt(daif);
 
     return first;
 }
@@ -151,14 +156,14 @@ static int tp_insert(timer_proc *tp)
  */
 static void timer_set()
 {
-    uint64 daif;
+    uint32 daif;
     timer_proc *tp;
 
-    daif = read_sysreg(DAIF);
-    disable_interrupt();
+    daif = save_and_disable_interrupt();
 
     if (!t_meta.size) {
-        write_sysreg(DAIF, daif);
+        restore_interrupt(daif);
+
         return;
     }
     
@@ -168,7 +173,7 @@ static void timer_set()
     t_interval = tp->remain_time;
     write_sysreg(cntp_tval_el0, t_interval);
 
-    write_sysreg(DAIF, daif);
+    restore_interrupt(daif);
 }
 
 static void timer_set_boot_cnt()
@@ -185,11 +190,13 @@ static void timer_show_boot_time(void *_)
                     (cntpct_el0 - timer_boot_cnt) / cntfrq_el0);
     }
 
-    timer_add_proc(timer_show_boot_time, NULL, 2);
+    timer_add_proc_after(timer_show_boot_time, NULL, 2);
 }
 
 void timer_init()
 {
+    uint64 cntkctl_el1;
+
     timer_set_boot_cnt();
 
     INIT_LIST_HEAD(&t_meta.head);
@@ -198,22 +205,31 @@ void timer_init()
     t_interval = 0;
     t_status = 0xffffffff;
 
-    timer_add_proc(timer_show_boot_time, NULL, 2);
+    // Allow EL0 to access timer
+    cntkctl_el1 = read_sysreg(CNTKCTL_EL1);
+    cntkctl_el1 |= 1;
+    write_sysreg(CNTKCTL_EL1, cntkctl_el1);
+
+    timer_add_proc_after(timer_show_boot_time, NULL, 2);
 }
 
-void timer_irq_check()
+int timer_irq_check()
 {
     uint32 core0_irq_src = get32(CORE0_IRQ_SOURCE);
 
-    if (core0_irq_src & 0x02) {
-        timer_disable();
-        if (irq_add_tasks(timer_irq_handler, NULL, 0)) {
-            timer_enable();
-        }
+    if (!(core0_irq_src & 0x02)) {
+        return 0;
     }
+
+    timer_disable();
+    if (irq_run_task(timer_irq_handler, NULL, timer_irq_fini, 0)) {
+        timer_enable();
+    }
+
+    return 1;
 }
 
-void timer_irq_handler()
+static void timer_irq_handler(void *_)
 {
     timer_proc *tp;
 
@@ -233,7 +249,10 @@ void timer_irq_handler()
     // Execute the callback function
     (tp->cb)(tp->args);
     tp_release(tp);
+}
 
+static void timer_irq_fini(void)
+{
     timer_enable();
 }
 
@@ -242,11 +261,22 @@ void timer_switch_info()
     timer_show_enable = !timer_show_enable;
 }
 
-void timer_add_proc(void (*proc)(void *), void *args, uint32 after)
+static void timer_add_proc(timer_proc *tp)
+{
+    int need_update;
+
+    need_update = tp_insert(tp);
+
+    if (need_update) {
+        timer_set();
+        timer_enable();
+    }
+}
+
+void timer_add_proc_after(void (*proc)(void *), void *args, uint32 after)
 {
     timer_proc *tp;
     uint32 cntfrq_el0;
-    int need_update;
 
     tp = tp_alloc();
 
@@ -259,10 +289,26 @@ void timer_add_proc(void (*proc)(void *), void *args, uint32 after)
     tp->cb = proc;
     tp->args = args;
     tp->remain_time = after * cntfrq_el0;
-    need_update = tp_insert(tp);
-    
-    if (need_update) {
-        timer_set();
-        timer_enable();
+
+    timer_add_proc(tp);
+}
+
+void timer_add_proc_freq(void (*proc)(void *), void *args, uint32 freq)
+{
+    timer_proc *tp;
+    uint32 cntfrq_el0;
+
+    tp = tp_alloc();
+
+    if (!tp) {
+        return;
     }
+
+    cntfrq_el0 = read_sysreg(cntfrq_el0);
+
+    tp->cb = proc;
+    tp->args = args;
+    tp->remain_time = cntfrq_el0 / freq;
+   
+    timer_add_proc(tp);
 }

@@ -1,5 +1,9 @@
 SECTIONS
 {
+  .start : {
+    *(.start)
+  }
+
   .text : {
     *(.text)
   }

@@ -9,6 +9,9 @@
 
 #define BUFSIZE 0x100
 
+static void uart_irq_handler(void *);
+static void uart_irq_fini(void);
+
 // UART asynchronous/synchronous mode
 // 0: Synchronous mode
 // 1: Asynchronous mode
@@ -85,6 +88,13 @@ void uart_send(char c)
     (uart_send_fp)(c);
 }
 
+void uart_recvn(char *buff, int n)
+{
+    while (n--) {
+        *buff++ = (uart_recv_fp)();
+    }
+}
+
 uint32 uart_recv_uint(void)
 {
     char buf[4];
@@ -123,7 +133,7 @@ uint32 uart_recvline(char *buff, int maxlen)
     return cnt;
 }
 
-void uart_sendn(char *str, int n)
+void uart_sendn(const char *str, int n)
 {
     while (n--) {
         (uart_send_fp)(*str++);
@@ -172,7 +182,7 @@ static void uart_send_num(sendfp _send_fp, int64 num, int base, int type)
 }
 
 // Ref: https://elixir.bootlin.com/linux/v3.5/source/arch/x86/boot/printf.c#L115
-static void _uart_printf(sendfp _send_fp, char *fmt, va_list args)
+static void _uart_printf(sendfp _send_fp, const char *fmt, va_list args)
 {
     const char *s;
     char c;
@@ -223,7 +233,7 @@ static void _uart_printf(sendfp _send_fp, char *fmt, va_list args)
     }
 }
 
-void uart_printf(char *fmt, ...)
+void uart_printf(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -233,7 +243,7 @@ void uart_printf(char *fmt, ...)
     va_end(args);
 }
 
-void uart_sync_printf(char *fmt, ...)
+void uart_sync_printf(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -275,27 +285,27 @@ void uart_init(void)
     uart_send_fp = uart_sync_send;
 }
 
-void uart_irq_check(void)
+int uart_irq_check(void)
 {
     uint32 iir = get32(AUX_MU_IIR_REG);
 
     if (iir & 0x01) {
         // No interrupt
-        return;
+        return 0;
     }
 
     // Disable RW interrupt
     put32(AUX_MU_IER_REG, 0);
-    if (irq_add_tasks((void (*)(void *))uart_irq_handler, NULL, 1)) {
+    if (irq_run_task(uart_irq_handler, NULL, uart_irq_fini, 1)) {
         put32(AUX_MU_IER_REG, 0x03);
     }
+
+    return 1;
 }
 
-void uart_irq_handler(void)
+static void uart_irq_handler(void *_)
 {
     uint32 iir = get32(AUX_MU_IIR_REG);
-    uint32 ier = get32(AUX_MU_IER_REG);
-    ier = ier & ~(0x03);
 
     if (iir & 0x02) {
         // Transmit holding register empty
@@ -310,6 +320,12 @@ void uart_irq_handler(void)
             r_tail = (r_tail + 1) % BUFSIZE;
         }
     }
+}
+
+static void uart_irq_fini(void)
+{
+    uint32 ier = get32(AUX_MU_IER_REG);
+    ier = ier & ~(0x03);
 
     // Set RW interrupt
     if (r_head != (r_tail + 1) % BUFSIZE) {

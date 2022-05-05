@@ -1,6 +1,6 @@
 #include <string.h>
 
-int strcmp(char *str1, char *str2)
+int strcmp(const char *str1, const char *str2)
 {
     char c1, c2;
 
@@ -9,7 +9,7 @@ int strcmp(char *str1, char *str2)
     return c1 - c2;
 }
 
-int strncmp(char *str1, char *str2, int n)
+int strncmp(const char *str1, const char *str2, int n)
 {
     char c1, c2;
 
@@ -21,7 +21,7 @@ int strncmp(char *str1, char *str2, int n)
     return n ? c1 - c2 : 0;
 }
 
-int strlen(char *str)
+int strlen(const char *str)
 {
     int ret = 0;
     
@@ -32,7 +32,7 @@ int strlen(char *str)
     return ret;
 }
 
-int atoi(char *str)
+int atoi(const char *str)
 {
     int i = 0, tmp = 0;
 
