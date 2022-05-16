@@ -158,7 +158,7 @@ static void uart_send_num(sendfp _send_fp, int64 num, int base, int type)
     char tmp[66];
     int i;
 
-    if (type | SIGN) {
+    if (type & SIGN) {
         if (num < 0) {
             (_send_fp)('-');
         }
@@ -170,8 +170,8 @@ static void uart_send_num(sendfp _send_fp, int64 num, int base, int type)
         tmp[i++] = '0';
     } else {
         while (num != 0) {
-            uint8 r = (uint32)num % base;
-            num = (uint32)num / base;
+            uint8 r = (uint64)num % base;
+            num = (uint64)num / base;
             tmp[i++] = digits[r];
         }
     }
