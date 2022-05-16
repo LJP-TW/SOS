@@ -64,11 +64,11 @@ void mm_init(void)
 {
     parse_dtb(fdt_base, memory_fdt_parser);
 
-    page_allocator_early_init((void *)0, (void *)memory_end);
+    page_allocator_early_init((void *)PA2VA(0), (void *)PA2VA(memory_end));
     sc_early_init();
 
-    // Spin tables for multicore boot
-    mem_reserve((void *)0, (void *)0x1000);
+    // Spin tables for multicore boot & Booting page tables
+    mem_reserve((void *)PA2VA(0), (void *)PA2VA(0x4000));
 
     // Kernel image in the physical memory
     mem_reserve(_start, &_stack_top);

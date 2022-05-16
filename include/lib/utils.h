@@ -60,4 +60,6 @@ static inline void restore_interrupt(uint32 daif)
 
 #define TO_CHAR_PTR(a) ((char *)(uint64)(a))
 
+#define PA2VA(x) ((uint64)x + 0xffff000000000000)
+
 #endif  /* _UTILS_H */

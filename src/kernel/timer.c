@@ -51,13 +51,13 @@ uint64 timer_boot_cnt;
 static void timer_enable()
 {
     // Enable core0 cntp timer
-    put32(CORE0_TIMER_IRQ_CTRL, 2);
+    put32(PA2VA(CORE0_TIMER_IRQ_CTRL), 2);
 }
 
 static void timer_disable()
 {
     // Disable core0 cntp timer
-    put32(CORE0_TIMER_IRQ_CTRL, 0);
+    put32(PA2VA(CORE0_TIMER_IRQ_CTRL), 0);
 }
 
 static timer_proc *tp_alloc()
@@ -215,7 +215,7 @@ void timer_init()
 
 int timer_irq_check()
 {
-    uint32 core0_irq_src = get32(CORE0_IRQ_SOURCE);
+    uint32 core0_irq_src = get32(PA2VA(CORE0_IRQ_SOURCE));
 
     if (!(core0_irq_src & 0x02)) {
         return 0;

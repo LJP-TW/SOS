@@ -12,6 +12,7 @@
 #include <sched.h>
 #include <signal.h>
 #include <mm/mm.h>
+#include <panic.h>
 
 #define KSTACK_VARIABLE(x)                      \
     (void *)((uint64)x -                        \
@@ -70,7 +71,8 @@ void syscall_handler(trapframe regs, uint32 syn)
 
     // SVC instruction execution
     if (esr->ec != 0x15) {
-        return;
+        panic("[X] Panic: esr->ec: %x", esr->ec);
+        // Never return
     }
 
     syscall_num = regs.x8;

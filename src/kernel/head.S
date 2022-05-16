@@ -9,6 +9,17 @@ _start:
   bl from_el2_to_el1
   // the next instruction runs in EL1
 
+  // Set booting stack
+  ldr x0, =_PA_stack_top
+  mov sp, x0
+
+  bl mmu_init
+
+  // Use virtual address after mmu_init
+  ldr x0, =_va_trampoline
+  br x0
+_va_trampoline:
+
   bl set_exception_vector_table
   
   bl enable_core0_timer

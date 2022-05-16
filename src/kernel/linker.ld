@@ -1,10 +1,11 @@
-_stack_top      = 0x00400000;
-_early_mem_base = 0x07000000;
-_early_mem_end  = 0x07ffffff;
+_stack_top      = 0xffff000000400000;
+_PA_stack_top   = 0x0000000000400000;
+_early_mem_base = 0xffff000007000000;
+_early_mem_end  = 0xffff000007ffffff;
 
 SECTIONS
 {
-  . = 0x80000;
+  . = 0xffff000000080000;
   
   .text.boot : {
     *(.text.boot)
