@@ -306,11 +306,11 @@ void start_kernel(char *fdt)
     uart_printf("[*] Kernel start!\r\n");
 
     // TODO: Remove shell?
-    kthread_create(shell);
+    // kthread_create(shell);
 
     // TODO: Add argv & envp
     // First user program
-    // sched_new_user_prog("syscall.img");
+    sched_new_user_prog("vm.img");
 
     // Enable interrupt from Auxiliary peripherals
     irq1_enable(29);

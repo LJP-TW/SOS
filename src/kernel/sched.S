@@ -21,4 +21,13 @@ switch_to:
     // set_current
     msr tpidr_el1, x1
 
+    // Switch page table 0
+    ldr x9, [x1, 8 * 13]
+    and x9, x9, #0x0000ffffffffffff
+    dsb ish             // ensure write has completed
+    msr ttbr0_el1, x9   // switch translation based address.
+    tlbi vmalle1is      // invalidate all TLB entries
+    dsb ish             // ensure completion of TLB invalidatation
+    isb                 // clear pipeline
+
     ret

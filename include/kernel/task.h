@@ -3,8 +3,9 @@
 
 #include <types.h>
 #include <list.h>
+#include <mmu.h>
 
-#define STACK_SIZE (2 * PAGE_SIZE)
+#define STACK_SIZE (4 * PAGE_SIZE)
 
 /* Task status */
 #define TASK_NEW        0
@@ -32,8 +33,9 @@ struct pt_regs {
 };
 
 typedef struct _task_struct {
-    /* This must be the first element */
     struct pt_regs regs;
+    pd_t *page_table;
+    /* The order of the above elements cannot be changed */
     void *kernel_stack;
     void *user_stack;
     /* TODO: Update to address_space */

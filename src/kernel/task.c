@@ -28,14 +28,17 @@ task_struct *task_create(void)
     task_struct *task;
     struct signal_head_t *signal;
     struct sighand_t *sighand;
+    pd_t *page_table;
     
     task = kmalloc(sizeof(task_struct));
     signal = signal_head_create();
     sighand = sighand_create();
+    page_table = pt_create();
 
     task->kernel_stack = NULL;
     task->user_stack = NULL;
     task->data = NULL;
+    task->page_table = page_table;
     INIT_LIST_HEAD(&task->list);
     list_add_tail(&task->task_list, &task_queue);
     task->status = TASK_NEW;
@@ -64,6 +67,8 @@ void task_free(task_struct *task)
 
     signal_head_free(task->signal);
     sighand_free(task->sighand);
+
+    pt_free(task->page_table);
 
     // TODO: release tid
     

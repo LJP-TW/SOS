@@ -12,11 +12,7 @@ void enter_el0_run_user_prog(void *entry, char *user_sp);
 
 static void user_prog_start(void)
 {
-    char *user_sp;
-
-    user_sp = (char *)current->user_stack + STACK_SIZE - 0x10;
-
-    enter_el0_run_user_prog(current->data, user_sp);
+    enter_el0_run_user_prog((void *)0, (char *)0xffffffffeff0);
 
     // User program should call exit() to terminate
 }
@@ -59,6 +55,15 @@ void sched_new_user_prog(char *filename)
 
     task->regs.sp = (char *)task->kernel_stack + STACK_SIZE - 0x10;
     pt_regs_init(&task->regs);
+
+    pt_map(task->page_table, (void *)0, datalen,
+           (void *)VA2PA(task->data), PT_R | PT_W | PT_X);
+    pt_map(task->page_table, (void *)0xffffffffb000, STACK_SIZE,
+           (void *)VA2PA(task->user_stack), PT_R | PT_W);
+
+    // TODO: Why is this needed for the vm.img to run?
+    pt_map(task->page_table, (void *)0x3c000000, 0x04000000,
+           (void *)0x3c000000, PT_R | PT_W);
 
     sched_add_task(task);
 

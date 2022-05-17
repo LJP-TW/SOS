@@ -148,6 +148,7 @@ void handle_signal(trapframe *frame)
         // Set user pc to handler
         frame->elr_el1 = sigaction->sighand;
 
+        // TODO: Map sigreturn to user address space and allow user to execute
         // Set user lr to sigreturn
         frame->x30 = (uint64)sigreturn;
     }
