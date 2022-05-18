@@ -44,7 +44,6 @@ void mmu_init(void)
     // 0x00000000 ~ 0x3f000000: Normal
     // 0x3f000000 ~ 0x40000000: Device
     // 0x40000000 ~ 0x80000000: Device
-    /* TODO: Support run user program in EL0 */
     BOOT_PGD[0] = (uint64)BOOT_PUD | PD_NSTABLE | PD_UXNTABLE | PD_TABLE;
 
     BOOT_PUD[0] = (uint64)BOOT_PMD | PD_TABLE;

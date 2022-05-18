@@ -38,7 +38,6 @@ typedef struct _task_struct {
     /* The order of the above elements cannot be changed */
     void *kernel_stack;
     void *user_stack;
-    /* TODO: Update to address_space */
     void *data;
     uint32 datalen;
     /* @list is used by run_queue / wait_queue */
