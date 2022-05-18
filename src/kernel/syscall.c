@@ -170,8 +170,8 @@ void syscall_exec(trapframe *_, const char* name, char *const argv[])
     pt_map(current->page_table, (void *)0xffffffffb000, STACK_SIZE,
            (void *)VA2PA(current->user_stack), PT_R | PT_W);
 
-    // TODO: Why is this needed for the vm.img to run?
-    pt_map(current->page_table, (void *)0x3c000000, 0x04000000,
+    // TODO: map the return addres of mailbox_call
+    pt_map(current->page_table, (void *)0x3c000000, 0x03000000,
            (void *)0x3c000000, PT_R | PT_W);
 
     set_page_table(current);
@@ -215,8 +215,8 @@ void syscall_fork(trapframe *frame)
     pt_map(child->page_table, (void *)0xffffffffb000, STACK_SIZE,
            (void *)VA2PA(child->user_stack), PT_R | PT_W);
 
-    // TODO: Why is this needed for the vm.img to run?
-    pt_map(child->page_table, (void *)0x3c000000, 0x04000000,
+    // TODO: map the return addres of mailbox_call
+    pt_map(child->page_table, (void *)0x3c000000, 0x03000000,
            (void *)0x3c000000, PT_R | PT_W);
 
     // Copy signal handler
@@ -257,6 +257,9 @@ void syscall_exit(trapframe *_)
     // Never reach
 }
 
+/*
+ * TODO: map the return addres of mailbox_call
+ */
 void syscall_mbox_call(trapframe *_, unsigned char ch, unsigned int *mbox)
 {
     int mbox_size;
