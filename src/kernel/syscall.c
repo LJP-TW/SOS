@@ -165,14 +165,11 @@ void syscall_exec(trapframe *_, const char* name, char *const argv[])
     // Reset page table
     pt_free(current->page_table);
     current->page_table = pt_create();
+    task_init_map(current);
+
+    // 0x000000000000 ~ <datalen>: rwx: Code
     pt_map(current->page_table, (void *)0, datalen,
            (void *)VA2PA(data), PT_R | PT_W | PT_X);
-    pt_map(current->page_table, (void *)0xffffffffb000, STACK_SIZE,
-           (void *)VA2PA(current->user_stack), PT_R | PT_W);
-
-    // TODO: map the return addres of mailbox_call
-    pt_map(current->page_table, (void *)0x3c000000, 0x03000000,
-           (void *)0x3c000000, PT_R | PT_W);
 
     set_page_table(current);
 
@@ -210,14 +207,11 @@ void syscall_fork(trapframe *frame)
     memncpy(child->data, current->data, current->datalen);
 
     // Set page table
+    task_init_map(child);
+
+    // 0x000000000000 ~ <datalen>: rwx: Code
     pt_map(child->page_table, (void *)0, child->datalen,
            (void *)VA2PA(child->data), PT_R | PT_W | PT_X);
-    pt_map(child->page_table, (void *)0xffffffffb000, STACK_SIZE,
-           (void *)VA2PA(child->user_stack), PT_R | PT_W);
-
-    // TODO: map the return addres of mailbox_call
-    pt_map(child->page_table, (void *)0x3c000000, 0x03000000,
-           (void *)0x3c000000, PT_R | PT_W);
 
     // Copy signal handler
     sighand_copy(child->sighand, child->data);

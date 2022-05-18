@@ -15,6 +15,16 @@ SECTIONS
     *(.text)
   }
 
+  . = ALIGN(0x1000);
+
+  _stext_user_shared = .;
+  .text.user.shared : {
+    *(.text.user.shared)
+  }
+
+  . = ALIGN(0x1000);
+  _etext_user_shared = .;
+
   .rodata : {
     *(.rodata)
   }
