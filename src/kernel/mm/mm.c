@@ -88,7 +88,7 @@ void mm_init(void)
     page_allocator_init();
     sc_init();
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
     page_allocator_test();
     sc_test();
 #endif

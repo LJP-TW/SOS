@@ -8,8 +8,6 @@
 
 // TODO: implement SIGSTOP & SIGCONT kernel handler
 
-#define DATA_OFFSET(x) ((uint64)current->data - (uint64)x)
-
 /* Kernel defined sighandler_t */
 #define SIG_DFL     (sighandler_t)0
 #define SIG_IGN     (sighandler_t)1
@@ -192,7 +190,7 @@ static inline void _sighand_copy(struct sigaction_t *to,
 }
 
 /* Copy current signal handler to @sighand */
-void sighand_copy(struct sighand_t *sighand, void *addrbase)
+void sighand_copy(struct sighand_t *sighand)
 {
     struct sighand_t *currhand;
 

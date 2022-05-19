@@ -2,6 +2,8 @@
 #define _MMU_H
 
 #include <types.h>
+#include <list.h>
+#include <arm.h>
 
 #define PAGE_TABLE_SIZE 0x1000
 
@@ -9,7 +11,33 @@
 #define PT_W    0x0002
 #define PT_X    0x0004
 
+#define VMA_R       PT_R
+#define VMA_W       PT_W
+#define VMA_X       PT_X
+// PA
+#define VMA_PA      0x0008
+// Kernel VA
+#define VMA_KVA     0x0010
+// Anonymous
+#define VMA_ANON    0x0020
+
 typedef uint64 pd_t;
+
+/* TODO: The vm_area_t linked list is not sorted, making it an ordered list. */
+typedef struct _vm_area_t {
+    /* @list links to next vm_area_t */
+    struct list_head list;
+    uint64 va_begin;
+    uint64 va_end;
+    uint64 flag;
+    /* @kva: Mapped kernel virtual address */
+    uint64 kva;
+} vm_area_t;
+
+typedef struct {
+    /* @vma links all vm_area_t */
+    struct list_head vma;
+} vm_area_meta_t;
 
 /*
  * Set identity paging, enable MMU
@@ -24,5 +52,14 @@ void pt_free(pd_t *pt);
  * @pt is PGD.
  */
 void pt_map(pd_t *pt, void *va, uint64 size, void *pa, uint64 flag);
+
+vm_area_meta_t *vma_meta_create(void);
+void vma_meta_free(vm_area_meta_t *vma_meta, pd_t *page_table);
+void vma_meta_copy(vm_area_meta_t *to, vm_area_meta_t *from, pd_t *page_table);
+
+void vma_map(vm_area_meta_t *vma_meta, void *va, uint64 size,
+             uint64 flag, void *addr);
+
+void mem_abort(esr_el1_t *esr);
 
 #endif /* _MMU_H */

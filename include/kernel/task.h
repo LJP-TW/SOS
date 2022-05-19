@@ -36,10 +36,8 @@ typedef struct _task_struct {
     struct pt_regs regs;
     pd_t *page_table;
     /* The order of the above elements cannot be changed */
+    vm_area_meta_t *address_space;
     void *kernel_stack;
-    void *user_stack;
-    void *data;
-    uint32 datalen;
     /* @list is used by run_queue / wait_queue */
     struct list_head list;
     /* @task_list links all tasks */
@@ -81,5 +79,7 @@ task_struct *task_get_by_tid(uint32 tid);
  * 0xffffffffb000 ~   <STACK_SIZE>: rw-: Stack
  */
 void task_init_map(task_struct *task);
+
+void task_reset_mm(task_struct *task);
 
 #endif /* _TASK_H */

@@ -193,7 +193,7 @@ l64_syn_eh:
 
   mov x0, sp
   mrs x1, esr_el1
-  bl syscall_handler
+  bl el0_sync_handler
 
   mov x0, sp
   bl exit_to_user_mode

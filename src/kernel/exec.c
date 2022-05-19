@@ -49,9 +49,6 @@ void sched_new_user_prog(char *filename)
     task = task_create();
 
     task->kernel_stack = kmalloc(STACK_SIZE);
-    task->user_stack = kmalloc(STACK_SIZE);
-    task->data = data;
-    task->datalen = datalen;
 
     task->regs.sp = (char *)task->kernel_stack + STACK_SIZE - 0x10;
     pt_regs_init(&task->regs);
@@ -59,8 +56,8 @@ void sched_new_user_prog(char *filename)
     task_init_map(task);
 
     // 0x000000000000 ~ <datalen>: rwx: Code
-    pt_map(task->page_table, (void *)0, datalen,
-           (void *)VA2PA(task->data), PT_R | PT_W | PT_X);
+    vma_map(task->address_space, (void *)0, datalen,
+           VMA_R | VMA_W | VMA_X | VMA_KVA, data);
 
     sched_add_task(task);
 

@@ -18,7 +18,7 @@ void *early_malloc(size_t size)
     tmp = cur;
     cur += size;
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
     uart_printf("[*] Early allocate: %llx ~ %llx\r\n", tmp, cur - 1);
 #endif
 

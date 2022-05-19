@@ -36,7 +36,7 @@ void memncpy(char *dst, char *src, unsigned long n);
     asm volatile("msr DAIFSet, 0xf"); \
 } while (0)
 
-#define set_page_table(task) do {               \
+#define set_page_table(page_table) do {         \
     asm volatile(                               \
         "mov x9, %0\n"                          \
         "and x9, x9, #0x0000ffffffffffff\n"     \
@@ -45,9 +45,15 @@ void memncpy(char *dst, char *src, unsigned long n);
         "tlbi vmalle1is\n"                      \
         "dsb ish\n"                             \
         "isb\n"                                 \
-        :: "r" (task->page_table)               \
+        :: "r" (page_table)                     \
     );                                          \
 } while (0)
+
+#define get_page_table() ({                     \
+    uint64 __val;                               \
+    __val = PA2VA(read_sysreg(TTBR0_EL1));      \
+    __val;                                      \
+})
 
 static inline uint32 save_and_disable_interrupt(void)
 {

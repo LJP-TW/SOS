@@ -1,5 +1,12 @@
 #include <mmu.h>
+#include <arm.h>
 #include <utils.h>
+#include <mini_uart.h>
+#include <exec.h>
+#include <panic.h>
+#include <preempt.h>
+#include <task.h>
+#include <current.h>
 #include <mm/mm.h>
 
 #define TCR_CONFIG_REGION_48bit (((64 - 48) << 0) | ((64 - 48) << 16))
@@ -27,6 +34,154 @@
 #define BOOT_PGD ((pd_t *)0x1000)
 #define BOOT_PUD ((pd_t *)0x2000)
 #define BOOT_PMD ((pd_t *)0x3000)
+
+static void segmentation_fault(void)
+{
+    uart_sync_printf("[Segmentation fault]: Kill Process\r\n");
+    exit_user_prog();
+
+    // Never reach
+}
+
+static vm_area_t *vma_create(void *va, uint64 size, uint64 flag, void *addr)
+{
+    vm_area_t *vma;
+
+    vma = kmalloc(sizeof(vm_area_t));
+    size = ALIGN(size, PAGE_SIZE);
+
+    vma->va_begin = (uint64)va;
+    vma->va_end = (uint64)va + size;
+    vma->flag = flag;
+
+    if (vma->flag & VMA_ANON) {
+        vma->kva = 0;
+    } else if (vma->flag & VMA_PA) {
+        vma->kva = PA2VA(addr);
+    } else if (vma->flag & VMA_KVA) {
+        vma->kva = (uint64)addr;
+    } else {
+        // Unexpected
+        panic("vma_create flag error");
+    }
+
+    return vma;
+}
+
+static void clone_uva_region(uint64 uva_begin, uint64 uva_end,
+                             pd_t *pt, uint64 flag)
+{
+    for (uint64 addr = uva_begin; addr < uva_end; addr += PAGE_SIZE) {
+        void *new_kva;
+        uint64 par;
+
+        // try to get the PA of UVA
+        asm volatile (
+            "at s1e0r, %0"
+            :: "r" (addr)
+        );
+
+        par = read_sysreg(PAR_EL1);
+
+        if (PAR_FAILED(par)) {
+            // VA to PA conversion aborted
+            continue;
+        }
+
+        // convert PA to KVA
+        par = PA2VA(PAR_PA(par));
+
+        // Allocate a page and copy content to this page
+        new_kva = kmalloc(PAGE_SIZE);
+        memncpy(new_kva, (void *)par, PAGE_SIZE);
+
+        // map @new_kva into @pt
+        pt_map(pt, (void *)addr, PAGE_SIZE, (void *)VA2PA(new_kva), flag);
+    }
+}
+
+static vm_area_t *vma_clone(vm_area_t *vma, pd_t *page_table)
+{
+    vm_area_t *new_vma;
+
+    new_vma = kmalloc(sizeof(vm_area_t));
+
+    new_vma->va_begin = vma->va_begin;
+    new_vma->va_end = vma->va_end;
+    new_vma->flag = vma->flag;
+
+    if (vma->flag & VMA_ANON) {
+        clone_uva_region(vma->va_begin, vma->va_end, page_table, vma->flag);
+        new_vma->kva = 0;
+    } else if (vma->flag & VMA_PA) {
+        new_vma->kva = vma->kva;
+    } else if (vma->flag & VMA_KVA) {
+        void *new_kva;
+        
+        new_kva = kmalloc(vma->va_end - vma->va_begin);
+        memncpy(new_kva, (void *)vma->kva, vma->va_end - vma->va_begin);
+
+        new_vma->kva = (uint64)new_kva;
+    } else {
+        // Unexpected
+        panic("vma_clone flag error");
+    }
+
+    return new_vma;
+}
+
+static void free_uva_region(uint64 uva_begin, uint64 uva_end)
+{
+    for (uint64 addr = uva_begin; addr < uva_end; addr += PAGE_SIZE) {
+        uint64 par;
+
+        // try to get the PA of UVA
+        asm volatile (
+            "at s1e0r, %0"
+            :: "r" (addr)
+        );
+
+        par = read_sysreg(PAR_EL1);
+
+        if (PAR_FAILED(par)) {
+            // VA to PA conversion aborted
+            continue;
+        }
+
+        // convert PA to KVA
+        par = PA2VA(PAR_PA(par));
+
+        // free KVA
+        kfree((void *)par);
+    }
+}
+
+static void vma_free(vm_area_t *vma)
+{
+    if (vma->kva && vma->flag & VMA_KVA) {
+        kfree((void *)vma->kva);
+    } else if (vma->flag & VMA_ANON) {
+        free_uva_region(vma->va_begin, vma->va_end);
+    } else if (!(vma->flag & VMA_PA)){
+        // Unexpected
+        panic("vma_free flag error");
+    }
+
+    kfree(vma);
+}
+
+static vm_area_t *vma_find(vm_area_meta_t *vma_meta, uint64 addr)
+{
+    vm_area_t *vma;
+
+    list_for_each_entry(vma, &vma_meta->vma, list) {
+        if (vma->va_begin <= addr && addr < vma->va_end) {
+            return vma;
+        }
+    }
+
+    return NULL;
+}
 
 void mmu_init(void)
 {
@@ -149,5 +304,179 @@ void pt_map(pd_t *pt, void *va, uint64 size, void *pa, uint64 flag)
     
     for (uint64 i = 0; i < size; i += PAGE_SIZE) {
         _pt_map(pt, (void *)((uint64)va + i), (void *)((uint64)pa + i), flag);
+    }
+}
+
+vm_area_meta_t *vma_meta_create(void)
+{
+    vm_area_meta_t *vma_meta;
+
+    vma_meta = kmalloc(sizeof(vm_area_meta_t));
+    INIT_LIST_HEAD(&vma_meta->vma);
+
+    return vma_meta;
+}
+
+void vma_meta_free(vm_area_meta_t *vma_meta, pd_t *page_table)
+{
+    uint64 old_page_table;
+    vm_area_t *vma, *safe;
+
+    old_page_table = get_page_table();
+    set_page_table(page_table);
+
+    preempt_disable();
+
+    list_for_each_entry_safe(vma, safe, &vma_meta->vma, list) {
+        vma_free(vma);
+    }
+
+    preempt_enable();
+
+    kfree(vma_meta);
+
+    set_page_table(old_page_table);
+}
+
+void vma_meta_copy(vm_area_meta_t *to, vm_area_meta_t *from, pd_t *page_table)
+{
+    uint64 old_page_table;
+    vm_area_t *vma, *new_vma;
+
+    old_page_table = get_page_table();
+    set_page_table(page_table);
+
+    preempt_disable();
+
+    list_for_each_entry(vma, &from->vma, list) {
+        new_vma = vma_clone(vma, (pd_t *)old_page_table);
+
+        list_add_tail(&new_vma->list, &to->vma);
+    }
+
+    preempt_enable();
+
+    set_page_table(old_page_table);
+}
+
+void vma_map(vm_area_meta_t *vma_meta, void *va, uint64 size,
+             uint64 flag, void *addr)
+{
+    vm_area_t *vma;
+    int cnt = 0;
+
+    if (flag & VMA_PA) cnt++;
+    if (flag & VMA_KVA) cnt++;
+    if (flag & VMA_ANON) cnt++;
+
+    if (cnt != 1) {
+        return;
+    }
+
+    if ((uint64)va & (PAGE_SIZE - 1)) {
+        return;
+    }
+
+    vma = vma_find(vma_meta, (uint64)va);
+    if (vma) {
+        return;
+    }
+
+    vma = vma_find(vma_meta, (uint64)va + size - 1);
+    if (vma) {
+        return;
+    }
+
+    vma = vma_create(va, size, flag, addr);
+
+    list_add_tail(&vma->list, &vma_meta->vma);
+}
+
+static void do_page_fault(esr_el1_t *esr)
+{
+    uint64 far;
+    uint64 va;
+    uint64 fault_perm;
+    vm_area_t *vma;
+
+    far = read_sysreg(FAR_EL1);
+
+    vma = vma_find(current->address_space, far);
+
+    if (!vma) {
+        segmentation_fault();
+        // Never reach
+    }
+
+    // Check permission
+    if (esr->ec == EC_IA_LE) {
+        // Execute abort
+        fault_perm = VMA_X;
+    } else if (ISS_WnR(esr)) {
+        // Write abort
+        fault_perm = VMA_W;
+    } else {
+        // Read abort
+        fault_perm = VMA_R;
+    }
+    
+    if (!(vma->flag & fault_perm)) {
+        goto PAGE_FAULT_INVALID;
+    }
+
+    va = far & ~(PAGE_SIZE - 1);
+
+    if (vma->kva) {
+        uint64 offset;
+
+        offset = va - vma->va_begin;
+        
+        pt_map(current->page_table, (void *)va, PAGE_SIZE, 
+               (void *)VA2PA(vma->kva + offset), vma->flag);
+    } else if (vma->flag & VMA_ANON) {
+        void *kva = kmalloc(PAGE_SIZE);
+
+        memzero(kva, PAGE_SIZE);
+
+        pt_map(current->page_table, (void *)va, PAGE_SIZE, 
+               (void *)VA2PA(kva), vma->flag);
+    } else {
+        // Unexpected result
+        goto PAGE_FAULT_INVALID;
+    }
+
+    return;
+
+PAGE_FAULT_INVALID:
+    segmentation_fault();
+
+    // Never reach
+}
+
+void mem_abort(esr_el1_t *esr)
+{
+    int fsc;
+#ifdef DEMANDING_PAGE_DEBUG
+    uint64 addr;
+
+    addr = read_sysreg(FAR_EL1);
+#endif
+
+    fsc = ISS_FSC(esr);
+
+    switch (fsc) {
+    case FSC_TF_L0:
+    case FSC_TF_L1:
+    case FSC_TF_L2:
+    case FSC_TF_L3:
+#ifdef DEMANDING_PAGE_DEBUG
+        uart_sync_printf("[Translation fault]: 0x%llx\r\n", addr);
+#endif
+        do_page_fault(esr);
+        break;
+    default:
+        segmentation_fault();
+
+        // Never reach
     }
 }

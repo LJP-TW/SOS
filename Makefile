@@ -43,8 +43,12 @@ LIB_ASM_FILES += $(shell find "$(SRC_DIR)/$(LIB_DIR)" -name "*.S")
 LIB_OBJ_FILES  = $(patsubst $(SRC_DIR)/$(LIB_DIR)/%.c,$(BUILD_DIR)/$(LIB_DIR)/%_c.o,$(LIB_C_FILES))
 LIB_OBJ_FILES += $(patsubst $(SRC_DIR)/$(LIB_DIR)/%.S,$(BUILD_DIR)/$(LIB_DIR)/%_s.o,$(LIB_ASM_FILES))
 
-ifdef DEBUG
-   CFLAGS += -g -DDEBUG
+ifdef MM_DEBUG
+	CFLAGS += -g -DMM_DEBUG
+endif
+
+ifdef DEMANDING_PAGE_DEBUG
+	CFLAGS += -g -DDEMANDING_PAGE_DEBUG
 endif
 
 all: $(KERNEL_IMG) $(BOOTLOADER_IMG)
