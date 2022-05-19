@@ -12,6 +12,7 @@
 #include <sched.h>
 #include <signal.h>
 #include <mm/mm.h>
+#include <mmu.h>
 
 #define KSTACK_VARIABLE(x)                      \
     (void *)((uint64)x -                        \
@@ -41,8 +42,9 @@ syscall_funcp syscall_table[] = {
     (syscall_funcp) syscall_kill_pid,
     (syscall_funcp) syscall_signal,     // 8
     (syscall_funcp) syscall_kill,
-    (syscall_funcp) syscall_show_info,
+    (syscall_funcp) syscall_mmap,
     (syscall_funcp) syscall_sigreturn,
+    (syscall_funcp) syscall_show_info,  // 12
 };
 
 void syscall_handler(trapframe *regs)

@@ -4,6 +4,7 @@
 #include <types.h>
 #include <list.h>
 #include <arm.h>
+#include <trapframe.h>
 
 #define PAGE_TABLE_SIZE 0x1000
 
@@ -61,5 +62,20 @@ void vma_map(vm_area_meta_t *vma_meta, void *va, uint64 size,
              uint64 flag, void *addr);
 
 void mem_abort(esr_el1_t *esr);
+
+/* syscalls */
+#define PROT_NONE   0
+#define PROT_READ   1
+#define PROT_WRITE  2
+#define PROT_EXEC   4
+
+#define MAP_ANONYMOUS       0x0020
+#define MAP_POPULATE        0x8000
+
+/*
+ * TODO: @fd, @file_offset are ignored currently.
+ */
+void syscall_mmap(trapframe *frame, void *addr, size_t len, int prot,
+                  int flags, int fd, int file_offset);
 
 #endif /* _MMU_H */

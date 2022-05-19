@@ -480,3 +480,67 @@ void mem_abort(esr_el1_t *esr)
         // Never reach
     }
 }
+
+void syscall_mmap(trapframe *frame, void *addr, size_t len, int prot,
+                  int flags, int fd, int file_offset)
+{
+    vm_area_t *vma;
+    int mapflag;
+
+    // do some initial work
+    len = ALIGN(len, PAGE_SIZE);
+
+    if (addr == NULL) {
+        addr = (void *)0x550000000000;
+    }
+
+    while (1) {
+        if ((uint64)addr > 0x0000ffffffffffff) {
+            frame->x0 = 0;
+            return;
+        }
+
+        vma = vma_find(current->address_space, (uint64)addr);
+        if (vma) {
+            addr = (void *)((uint64)addr + 0x10000000);
+            continue;
+        }
+
+        vma = vma_find(current->address_space, (uint64)addr + len - 1);
+        if (vma) {
+            addr = (void *)((uint64)addr + 0x10000000);
+            continue;
+        }
+
+        break;
+    }
+
+    mapflag = 0;
+
+    if (prot & PROT_READ)  mapflag |= VMA_R;
+    if (prot & PROT_WRITE) mapflag |= VMA_W;
+    if (prot & PROT_EXEC)  mapflag |= VMA_X;
+
+    if (flags & MAP_POPULATE) {
+        void *kva;
+        
+        mapflag |= VMA_KVA;
+
+        kva = kmalloc(len);
+        memzero(kva, len);
+
+        vma_map(current->address_space, addr, len, mapflag, kva);
+
+        pt_map(current->page_table, addr, len, (void *)VA2PA(kva), mapflag);
+    } else if (flags & MAP_ANONYMOUS) {
+        mapflag |= VMA_ANON;
+
+        vma_map(current->address_space, addr, len, mapflag, NULL);
+    } else {
+        // Unexpected.
+        frame->x0 = 0;
+        return;
+    }
+
+    frame->x0 = (uint64)addr;
+}
