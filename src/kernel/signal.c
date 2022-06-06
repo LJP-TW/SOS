@@ -5,6 +5,7 @@
 #include <preempt.h>
 #include <mm/mm.h>
 #include <text_user_shared.h>
+#include <syscall.h>
 
 // TODO: implement SIGSTOP & SIGCONT kernel handler
 
@@ -33,9 +34,8 @@ static void sig_ignore(int _)
 void sigreturn(void) SECTION_TUS;
 void sigreturn(void)
 {
-    // sigreturn: syscall 11
     asm volatile(
-        "mov x8, 11\n"
+        "mov x8, " MC2STR(SCNUM_SIGRETURN) "\n"
         "svc 0\n"
     );
 }

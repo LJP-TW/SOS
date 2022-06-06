@@ -12,6 +12,7 @@
 #include <sched.h>
 #include <kthread.h>
 #include <current.h>
+#include <fs/fsinit.h>
 
 #define BUFSIZE 0x100
 
@@ -88,13 +89,11 @@ static void cmd_help(void)
 {
     uart_printf(
                 "alloc <size>\t: "   "test allocator" "\r\n"
-                "cat <filename>\t: " "get file content"  "\r\n"
                 "exec <filename>\t: " "execute file"  "\r\n"
                 "free <idx>\t: " "test allocator"  "\r\n"
                 "help\t: "   "print this help menu" "\r\n"
                 "hello\t: "  "print Hello World!"   "\r\n"
                 "hwinfo\t: " "print hardware info"  "\r\n"
-                "ls\t: " "list files in initramfs"  "\r\n"
                 "parsedtb\t: " "parse devicetree blob (dtb)"  "\r\n"
                 "reboot\t: " "reboot the device"    "\r\n"
                 "setTimeout <msg> <sec>\t: " 
@@ -162,16 +161,6 @@ static void cmd_sw_uart_mode(void)
     } else {
         uart_printf("[*] Use asynchronous UART\r\n");
     }
-}
-
-static void cmd_ls(void)
-{
-    cpio_ls(initramfs_base);
-}
-
-static void cmd_cat(char *filename)
-{
-    cpio_cat(initramfs_base, filename);
 }
 
 static void cmd_exec(char *filename)
@@ -260,16 +249,10 @@ static void shell(void)
             cmd_sw_timer();
         } else if (!strcmp("sw_uart_mode", shell_buf)) {
             cmd_sw_uart_mode();
-        } else if (!strcmp("ls", shell_buf)) {
-            cmd_ls();
         } else if (!strcmp("parsedtb", shell_buf)) {
             cmd_parsedtb();
         } else if (!strcmp("thread_test", shell_buf)) {
             cmd_thread_test();
-        } else if (!strncmp("cat", shell_buf, 3)) {
-            if (cmd_len >= 5) {
-                cmd_cat(&shell_buf[4]);
-            }
         } else if (!strncmp("exec", shell_buf, 4)) {
             if (cmd_len >= 6) {
                 cmd_exec(&shell_buf[5]);
@@ -300,7 +283,9 @@ void start_kernel(char *fdt)
     timer_init();
     task_init();
     scheduler_init();
+    fs_early_init();
     kthread_init();
+    fs_init();
 
     uart_printf("[*] fdt base: %x\r\n", fdt_base);
     uart_printf("[*] Kernel start!\r\n");
@@ -310,7 +295,7 @@ void start_kernel(char *fdt)
 
     // TODO: Add argv & envp
     // First user program
-    sched_new_user_prog("vm.img");
+    sched_new_user_prog("/initramfs/vfs1.img");
 
     // Enable interrupt from Auxiliary peripherals
     irq1_enable(29);

@@ -4,8 +4,11 @@
 #include <types.h>
 #include <list.h>
 #include <mmu.h>
+#include <fs/vfs.h>
 
 #define STACK_SIZE (4 * PAGE_SIZE)
+
+#define TASK_MAX_FD     0x10
 
 /* Task status */
 #define TASK_NEW        0
@@ -49,6 +52,10 @@ typedef struct _task_struct {
     /* Signal */
     struct signal_head_t *signal;
     struct sighand_t *sighand;
+    /* Files */
+    int maxfd;
+    struct file fds[TASK_MAX_FD];
+    struct vnode *work_dir;
 } task_struct;
 
 #define SAVE_REGS(task) \
