@@ -4,8 +4,8 @@
 #include <fs/vfs.h>
 #include <fs/tmpfs.h>
 #include <fs/cpiofs.h>
+#include <fs/uartfs.h>
 
-void fs_early_init(void);
 void fs_init(void);
 
 #endif /* _FSINIT_H */

@@ -283,9 +283,9 @@ void start_kernel(char *fdt)
     timer_init();
     task_init();
     scheduler_init();
-    fs_early_init();
-    kthread_init();
+    kthread_early_init();
     fs_init();
+    kthread_init();
 
     uart_printf("[*] fdt base: %x\r\n", fdt_base);
     uart_printf("[*] Kernel start!\r\n");

@@ -208,7 +208,11 @@ int vfs_mkdir(const char *pathname)
 
     curname = pathname;
 
-    dir_node = get_dir_vnode(current->work_dir, &curname);
+    if (current) {
+        dir_node = get_dir_vnode(current->work_dir, &curname);
+    } else {
+        dir_node = get_dir_vnode(rootmount->root, &curname);
+    }
 
     if (!dir_node) {
         return -1;
@@ -232,7 +236,12 @@ int vfs_mount(const char *mountpath, const char *filesystem)
     int ret;
 
     curname = mountpath;
-    dir_node = get_dir_vnode(current->work_dir, &curname);
+
+    if (current) {
+        dir_node = get_dir_vnode(current->work_dir, &curname);
+    } else {
+        dir_node = get_dir_vnode(rootmount->root, &curname);
+    }
     
     if (!dir_node) {
         return -1;
@@ -334,7 +343,7 @@ static int do_close(int fd)
 {
     int ret;
 
-    if (fd > current->maxfd) {
+    if (fd < 0 || current->maxfd < fd) {
         return -1;
     }
 
@@ -355,7 +364,7 @@ static int do_write(int fd, const void *buf, uint64 count)
 {
     int ret;
 
-    if (fd > current->maxfd) {
+    if (fd < 0 || current->maxfd < fd) {
         return -1;
     }
 
@@ -372,7 +381,7 @@ static int do_read(int fd, void *buf, uint64 count)
 {
     int ret;
 
-    if (fd > current->maxfd) {
+    if (fd < 0 || current->maxfd < fd) {
         return -1;
     }
 

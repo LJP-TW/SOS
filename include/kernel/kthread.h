@@ -3,6 +3,7 @@
 
 #include <task.h>
 
+void kthread_early_init(void);
 void kthread_init(void);
 
 void kthread_create(void (*start)(void));

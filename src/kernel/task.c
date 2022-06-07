@@ -52,8 +52,13 @@ task_struct *task_create(void)
     task->signal = signal;
     task->sighand = sighand;
 
-    task->maxfd = -1;
     task->work_dir = rootmount->root;
+
+    vfs_open("/dev/uart", 0, &task->fds[0]);
+    vfs_open("/dev/uart", 0, &task->fds[1]);
+    vfs_open("/dev/uart", 0, &task->fds[2]);
+
+    task->maxfd = 2;
 
     return task;
 }
