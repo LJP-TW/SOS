@@ -80,10 +80,10 @@ void task_free(task_struct *task)
 
     for (int i = 0; i <= task->maxfd; ++i) {
         if (task->fds[i].vnode != NULL) {
-            task->fds[i].f_ops->close(&task->fds[i]);
+            vfs_close(&task->fds[i]);
         }
     }
-    
+
     kfree(task);
 }
 

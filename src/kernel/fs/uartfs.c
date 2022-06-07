@@ -38,13 +38,15 @@ static int uartfs_read(struct file *file, void *buf, size_t len);
 static int uartfs_open(struct vnode *file_node, struct file *target);
 static int uartfs_close(struct file *file);
 static long uartfs_lseek64(struct file *file, long offset, int whence);
+static int uartfs_ioctl(struct file *file, uint64 request, va_list args);
 
 static struct file_operations uartfs_f_ops = {
     .write = uartfs_write,
     .read = uartfs_read,
     .open = uartfs_open,
     .close = uartfs_close,
-    .lseek64 = uartfs_lseek64
+    .lseek64 = uartfs_lseek64,
+    .ioctl = uartfs_ioctl
 };
 
 /* filesystem methods */
@@ -152,6 +154,11 @@ static int uartfs_close(struct file *file)
 }
 
 static long uartfs_lseek64(struct file *file, long offset, int whence)
+{
+    return -1;
+}
+
+static int uartfs_ioctl(struct file *file, uint64 request, va_list args)
 {
     return -1;
 }

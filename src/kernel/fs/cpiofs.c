@@ -4,6 +4,7 @@
 #include <utils.h>
 #include <string.h>
 #include <panic.h>
+#include <preempt.h>
 
 #define CPIO_TYPE_MASK  0060000
 #define CPIO_TYPE_DIR   0040000
@@ -86,13 +87,15 @@ static int cpiofs_read(struct file *file, void *buf, size_t len);
 static int cpiofs_open(struct vnode *file_node, struct file *target);
 static int cpiofs_close(struct file *file);
 static long cpiofs_lseek64(struct file *file, long offset, int whence);
+static int cpiofs_ioctl(struct file *file, uint64 request, va_list args);
 
 static struct file_operations cpiofs_f_ops = {
     .write = cpiofs_write,
     .read = cpiofs_read,
     .open = cpiofs_open,
     .close = cpiofs_close,
-    .lseek64 = cpiofs_lseek64
+    .lseek64 = cpiofs_lseek64,
+    .ioctl = cpiofs_ioctl
 };
 
 /* filesystem methods */
@@ -102,9 +105,17 @@ static int cpiofs_mount(struct filesystem *fs, struct mount *mount)
     struct cpiofs_internal *internal;
     const char *name;
 
+    preempt_disable();
+
     if (cpio_mounted) {
+        preempt_enable();
+
         return -1;
     }
+
+    cpio_mounted = 1;
+
+    preempt_enable();
 
     oldnode = mount->root;
 
@@ -287,6 +298,11 @@ static long cpiofs_lseek64(struct file *file, long offset, int whence)
     file->f_pos = base + offset;
 
     return 0;
+}
+
+static int cpiofs_ioctl(struct file *file, uint64 request, va_list args)
+{
+    return -1;
 }
 
 /* Others */

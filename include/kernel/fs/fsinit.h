@@ -5,6 +5,7 @@
 #include <fs/tmpfs.h>
 #include <fs/cpiofs.h>
 #include <fs/uartfs.h>
+#include <fs/framebufferfs.h>
 
 void fs_init(void);
 
