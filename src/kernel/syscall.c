@@ -12,21 +12,12 @@
 #include <sched.h>
 #include <signal.h>
 #include <mm/mm.h>
+#include <mmu.h>
 
 #define KSTACK_VARIABLE(x)                      \
     (void *)((uint64)x -                        \
              (uint64)current->kernel_stack +    \
              (uint64)child->kernel_stack)
-
-#define USTACK_VARIABLE(x)                      \
-    (void *)((uint64)x -                        \
-             (uint64)current->user_stack +      \
-             (uint64)child->user_stack)
-
-#define DATA_VARIABLE(x)                        \
-    (void *)((uint64)x -                        \
-             (uint64)current->data +            \
-             (uint64)child->data)
 
 typedef void (*syscall_funcp)();
 
@@ -51,29 +42,16 @@ syscall_funcp syscall_table[] = {
     (syscall_funcp) syscall_kill_pid,
     (syscall_funcp) syscall_signal,     // 8
     (syscall_funcp) syscall_kill,
-    (syscall_funcp) syscall_show_info,
+    (syscall_funcp) syscall_mmap,
     (syscall_funcp) syscall_sigreturn,
+    (syscall_funcp) syscall_show_info,  // 12
 };
 
-typedef struct {
-    unsigned int iss:25, // Instruction specific syndrome
-                 il:1,   // Instruction length bit
-                 ec:6;   // Exception class
-} esr_el1;
-
-void syscall_handler(trapframe regs, uint32 syn)
+void syscall_handler(trapframe *regs)
 {
-    esr_el1 *esr;
     uint64 syscall_num;
-      
-    esr = (esr_el1 *)&syn;
 
-    // SVC instruction execution
-    if (esr->ec != 0x15) {
-        return;
-    }
-
-    syscall_num = regs.x8;
+    syscall_num = regs->x8;
 
     if (syscall_num > ARRAY_SIZE(syscall_table)) {
         // Invalid syscall
@@ -82,8 +60,13 @@ void syscall_handler(trapframe regs, uint32 syn)
 
     enable_interrupt();
 
-    (syscall_table[syscall_num])(&regs,
-        regs.x0, regs.x1, regs.x2, regs.x3, regs.x4, regs.x5);
+    (syscall_table[syscall_num])(regs,
+                                 regs->x0,
+                                 regs->x1,
+                                 regs->x2,
+                                 regs->x3,
+                                 regs->x4,
+                                 regs->x5);
 
     disable_interrupt();
 }
@@ -108,7 +91,6 @@ void syscall_exec(trapframe *_, const char* name, char *const argv[])
 {
     void *data;
     char *kernel_sp;
-    char *user_sp;
     uint32 datalen;
     
     datalen = cpio_load_prog(initramfs_base, name, (char **)&data);
@@ -121,18 +103,24 @@ void syscall_exec(trapframe *_, const char* name, char *const argv[])
 
     // TODO: Clear user stack
 
-    kfree(current->data);
-    current->data = data;
-    current->datalen = datalen;
-
     kernel_sp = (char *)current->kernel_stack + STACK_SIZE - 0x10;
-    user_sp = (char *)current->user_stack + STACK_SIZE - 0x10;
 
     // Reset signal
     signal_head_reset(current->signal);
     sighand_reset(current->sighand);
 
-    exec_user_prog(current->data, user_sp, kernel_sp);
+    // Reset address_space & page table
+    task_reset_mm(current);
+
+    task_init_map(current);
+
+    // 0x000000000000 ~ <datalen>: rwx: Code
+    vma_map(current->address_space, (void *)0, datalen,
+           VMA_R | VMA_W | VMA_X | VMA_KVA, data);
+
+    set_page_table(current->page_table);
+
+    exec_user_prog((void *)0, (char *)0xffffffffeff0, kernel_sp);
 }
 
 static inline void copy_regs(struct pt_regs *regs)
@@ -157,24 +145,25 @@ void syscall_fork(trapframe *frame)
     child = task_create();
 
     child->kernel_stack = kmalloc(STACK_SIZE);
-    child->user_stack = kmalloc(STACK_SIZE);    
-    child->data = kmalloc(current->datalen);
-    child->datalen = current->datalen;
-
     memncpy(child->kernel_stack, current->kernel_stack, STACK_SIZE);
-    memncpy(child->user_stack, current->user_stack, STACK_SIZE);
-    memncpy(child->data, current->data, current->datalen);
+
+    // TODO: Implement copy on write
+
+    // Copy address_space
+    vma_meta_copy(child->address_space,
+                  current->address_space,
+                  current->page_table);
 
     // Copy signal handler
-    sighand_copy(child->sighand, child->data);
+    sighand_copy(child->sighand);
 
-    // Save regs
+    // Save registers
     SAVE_REGS(current);
 
-    // Copy register
+    // Copy registers
     copy_regs(&child->regs);
 
-    // Copy stack realted registers
+    // Copy stack related registers
     child->regs.fp = KSTACK_VARIABLE(current->regs.fp);
     child->regs.sp = KSTACK_VARIABLE(current->regs.sp);
 
@@ -185,9 +174,6 @@ void syscall_fork(trapframe *frame)
     child_frame = KSTACK_VARIABLE(frame);
 
     child_frame->x0 = 0;
-    child_frame->x30 = (uint64)DATA_VARIABLE(frame->x30);
-    child_frame->sp_el0 = USTACK_VARIABLE(frame->sp_el0);
-    child_frame->elr_el1 = DATA_VARIABLE(frame->elr_el1);
 
     sched_add_task(child);
 
@@ -206,9 +192,28 @@ void syscall_exit(trapframe *_)
     // Never reach
 }
 
+/*
+ * TODO: map the return addres of mailbox_call
+ */
 void syscall_mbox_call(trapframe *_, unsigned char ch, unsigned int *mbox)
 {
-    mailbox_call(ch, mbox);
+    int mbox_size;
+    char *kmbox;
+
+    mbox_size = (int)mbox[0];
+
+    if (mbox_size <= 0)
+        return;
+
+    kmbox = kmalloc(mbox_size);
+
+    memncpy(kmbox, (char *)mbox, mbox_size);
+
+    mailbox_call(ch, (unsigned int *)kmbox);
+
+    memncpy((char *)mbox, kmbox, mbox_size);
+
+    kfree(kmbox);
 }
 
 void syscall_kill_pid(trapframe *_, int pid)

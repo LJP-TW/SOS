@@ -52,7 +52,7 @@ void *alloc_page(void);
 
 void free_page(void *page);
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
 void page_allocator_test(void);
 #endif
 

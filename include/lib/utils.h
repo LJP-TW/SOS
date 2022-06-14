@@ -36,6 +36,25 @@ void memncpy(char *dst, char *src, unsigned long n);
     asm volatile("msr DAIFSet, 0xf"); \
 } while (0)
 
+#define set_page_table(page_table) do {         \
+    asm volatile(                               \
+        "mov x9, %0\n"                          \
+        "and x9, x9, #0x0000ffffffffffff\n"     \
+        "dsb ish\n"                             \
+        "msr ttbr0_el1, x9\n"                   \
+        "tlbi vmalle1is\n"                      \
+        "dsb ish\n"                             \
+        "isb\n"                                 \
+        :: "r" (page_table)                     \
+    );                                          \
+} while (0)
+
+#define get_page_table() ({                     \
+    uint64 __val;                               \
+    __val = PA2VA(read_sysreg(TTBR0_EL1));      \
+    __val;                                      \
+})
+
 static inline uint32 save_and_disable_interrupt(void)
 {
     uint32 daif;
@@ -59,5 +78,8 @@ static inline void restore_interrupt(uint32 daif)
 #define ALIGN(num, base) ((num + base - 1) & ~(base - 1))
 
 #define TO_CHAR_PTR(a) ((char *)(uint64)(a))
+
+#define PA2VA(x) (((uint64)(x)) | 0xffff000000000000)
+#define VA2PA(x) (((uint64)(x)) & 0x0000ffffffffffff)
 
 #endif  /* _UTILS_H */

@@ -14,7 +14,7 @@ void *sc_alloc(int size);
  */
 int sc_free(void *sc);
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
 void sc_test(void);
 #endif
 

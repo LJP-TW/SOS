@@ -99,7 +99,7 @@ void *sc_alloc(int size)
             list_add_tail(&hdr->list, &sc_freelists[size_idx]);
         }
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
         uart_sync_printf("[sc] Create chunks (page: %d; size: %d)\r\n", 
                     frame_idx, sc_sizes[size_idx]);
 #endif
@@ -108,7 +108,7 @@ void *sc_alloc(int size)
     hdr = list_first_entry(&sc_freelists[size_idx], sc_hdr, list);
     list_del(&hdr->list);
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
     uart_sync_printf("[sc] Allocate chunks %llx (request: %d; chunksize: %d)\r\n", 
                 hdr,
                 size,
@@ -135,7 +135,7 @@ int sc_free(void *sc)
     hdr = (sc_hdr *)sc;
     list_add(&hdr->list, &sc_freelists[size_idx]);
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
     uart_sync_printf("[sc] Free chunks %llx(size: %d)\r\n", 
                 sc,
                 sc_sizes[size_idx]);
@@ -144,7 +144,7 @@ int sc_free(void *sc)
     return 0;
 }
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
 void sc_test(void)
 {
     char *ptr1 = sc_alloc(0x18); // A; Allocate a page and create 0x20 chunks

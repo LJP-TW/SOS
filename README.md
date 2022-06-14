@@ -20,7 +20,11 @@ make
 
 * Build kernel8.img with some debug information:
 ```
-make DEBUG=1
+# Options:
+#   MM_DEBUG
+#   DEMANDING_PAGE_DEBUG
+make MM_DEBUG=1
+make DEMANDING_PAGE_DEBUG=1
 ```
 
 * Build myos.img (which you can dd to SD card):

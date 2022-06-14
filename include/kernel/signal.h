@@ -79,7 +79,7 @@ void sighand_free(struct sighand_t *sighand);
 void sighand_reset(struct sighand_t *sighand);
 
 /* Copy current signal handler to @sighand */
-void sighand_copy(struct sighand_t *sighand, void *addrbase);
+void sighand_copy(struct sighand_t *sighand);
 
 /* syscalls */
 void syscall_signal(trapframe *_, uint32 signal, void (*handler)(int));

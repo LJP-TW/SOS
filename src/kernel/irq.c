@@ -251,5 +251,5 @@ void exception_default_handler(uint32 n)
 
 void irq1_enable(int bit)
 {
-    put32(IRQ_ENABLE_1_REG, 1 << bit);
+    put32(PA2VA(IRQ_ENABLE_1_REG), 1 << bit);
 }

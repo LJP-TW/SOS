@@ -71,7 +71,7 @@ void page_allocator_early_init(void *start, void *end)
         frame_ents[i].allocated = 0;
     }
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
     uart_sync_printf("[*] init buddy (%llx ~ %llx)\r\n", buddy_base, buddy_end);
 #endif
 }
@@ -86,7 +86,7 @@ void mem_reserve(void *start, void *end)
 
         frame_ents[idx].allocated = 1;
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
         uart_sync_printf("[*] preserve page idx %d (%llx)\r\n", idx, start);
 #endif
     }
@@ -136,7 +136,7 @@ void page_allocator_init(void)
             hdr = idx2addr(idx);
             list_add_tail(&hdr->list, &freelists[exp]);
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
             uart_sync_printf("[*] page init, idx %d belong to exp %d\r\n",
                         idx, exp);
 #endif
@@ -149,7 +149,7 @@ void *alloc_pages(int num)
     frame_hdr *hdr;
     int idx, topexp, exp;
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
     uart_sync_printf("[*] alloc_pages %d pages\r\n", num);
 #endif
 
@@ -193,7 +193,7 @@ void *alloc_pages(int num)
         buddy_hdr = idx2addr(buddy_idx);
         list_add(&buddy_hdr->list, &freelists[topexp]);
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
         uart_sync_printf("[*] Expand to idx (%d, %d) to exp (%d)\r\n",
             idx, buddy_idx, topexp);
 #endif
@@ -202,7 +202,7 @@ void *alloc_pages(int num)
     frame_ents[idx].exp = exp;
     frame_ents[idx].allocated = 1;
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
     uart_sync_printf("[*] Allocate idx %d exp %d\r\n", 
         idx, exp);
 #endif
@@ -231,7 +231,7 @@ static inline void _free_page(frame_hdr *page)
     while (exp + 1 < FREELIST_CNT &&
            !frame_ents[buddy_idx].allocated &&
            frame_ents[buddy_idx].exp == exp) {
-#ifdef DEBUG
+#ifdef MM_DEBUG
         uart_sync_printf("[*] merge idx (%d, %d) to exp (%d)\r\n",
                     idx, buddy_idx, exp + 1);
 #endif
@@ -262,14 +262,14 @@ void free_page(void *page)
         return;
     }
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
     uart_sync_printf("[*] free_page idx %d\r\n", addr2idx(page));
 #endif
 
     _free_page((frame_hdr *)page);
 }
 
-#ifdef DEBUG
+#ifdef MM_DEBUG
 void page_allocator_test(void)
 {
     char *ptr1 = alloc_pages(2);

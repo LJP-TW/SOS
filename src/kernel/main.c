@@ -310,7 +310,7 @@ void start_kernel(char *fdt)
 
     // TODO: Add argv & envp
     // First user program
-    sched_new_user_prog("syscall.img");
+    sched_new_user_prog("vm.img");
 
     // Enable interrupt from Auxiliary peripherals
     irq1_enable(29);

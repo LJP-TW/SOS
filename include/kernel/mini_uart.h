@@ -1,6 +1,7 @@
 #ifndef _MINI_UART_H
 #define _MINI_UART_H
 
+#include <stdarg.h>
 #include <types.h>
 
 uint32 uart_recvline(char *buff, int maxlen);
@@ -13,6 +14,7 @@ void uart_sendn(const char *str, int n);
 void uart_printf(const char *fmt, ...);
 
 void uart_sync_printf(const char *fmt, ...);
+void uart_sync_vprintf(const char *fmt, va_list args);
 
 int uart_irq_check(void);
 

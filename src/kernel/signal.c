@@ -4,10 +4,9 @@
 #include <current.h>
 #include <preempt.h>
 #include <mm/mm.h>
+#include <text_user_shared.h>
 
 // TODO: implement SIGSTOP & SIGCONT kernel handler
-
-#define DATA_OFFSET(x) ((uint64)current->data - (uint64)x)
 
 /* Kernel defined sighandler_t */
 #define SIG_DFL     (sighandler_t)0
@@ -31,10 +30,7 @@ static void sig_ignore(int _)
     return;
 }
 
-/*
- * TODO: This function runs in user mode, make user can execute this function
- *       when MMU is enable.
- */
+void sigreturn(void) SECTION_TUS;
 void sigreturn(void)
 {
     // sigreturn: syscall 11
@@ -149,7 +145,7 @@ void handle_signal(trapframe *frame)
         frame->elr_el1 = sigaction->sighand;
 
         // Set user lr to sigreturn
-        frame->x30 = (uint64)sigreturn;
+        frame->x30 = TUS2VA(sigreturn);
     }
 
     signal_del(signal);
@@ -186,37 +182,22 @@ void sighand_reset(struct sighand_t *sighand)
     sighand->sigactions[SIGKILL].sighand = sig_termiante;
 }
 
-static inline void kernel_sighand_copy(struct sigaction_t *from,
-                                       struct sigaction_t *to)
+static inline void _sighand_copy(struct sigaction_t *to,
+                                struct sigaction_t *from)
 {
-    to->kernel_hand = 1;
+    to->kernel_hand = from->kernel_hand;
     to->sighand = from->sighand;
 }
 
-static inline void user_sighand_copy(struct sigaction_t *from,
-                                     struct sigaction_t *to,
-                                     uint64 offset)
-{
-    to->kernel_hand = 0;
-    to->sighand = (sighandler_t)((char *)from->sighand - offset);
-}
-
 /* Copy current signal handler to @sighand */
-void sighand_copy(struct sighand_t *sighand, void *addrbase)
+void sighand_copy(struct sighand_t *sighand)
 {
     struct sighand_t *currhand;
 
     currhand = current->sighand;
 
     for (int i = 1; i < NSIG; ++i) {
-        if (currhand->sigactions[i].kernel_hand) {
-            kernel_sighand_copy(&currhand->sigactions[i],
-                                &sighand->sigactions[i]);
-        } else {
-            user_sighand_copy(&currhand->sigactions[i],
-                              &sighand->sigactions[i],
-                              DATA_OFFSET(addrbase));
-        }
+        _sighand_copy(&sighand->sigactions[i], &currhand->sigactions[i]);
     }
 }
 
