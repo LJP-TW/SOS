@@ -45,6 +45,11 @@ void kthread_fini(void)
     // Never reach
 }
 
+void kthread_early_init(void)
+{
+    set_current(NULL);
+}
+
 void kthread_init(void)
 {
     task_struct *task;

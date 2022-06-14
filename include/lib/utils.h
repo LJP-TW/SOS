@@ -10,7 +10,7 @@ void put32(uint64 addr, uint32 val);
 uint32 get32(uint64 addr);
 
 void memzero(char *src, unsigned long n);
-void memncpy(char *dst, char *src, unsigned long n);
+void memncpy(char *dst, const char *src, unsigned long n);
 
 #endif /* __ASSEMBLER__ */
 
@@ -81,5 +81,8 @@ static inline void restore_interrupt(uint32 daif)
 
 #define PA2VA(x) (((uint64)(x)) | 0xffff000000000000)
 #define VA2PA(x) (((uint64)(x)) & 0x0000ffffffffffff)
+
+#define M2STR(macro) #macro
+#define MC2STR(macro) M2STR(macro)
 
 #endif  /* _UTILS_H */

@@ -32,6 +32,22 @@ int strlen(const char *str)
     return ret;
 }
 
+int strcpy(char *dst, const char *src)
+{
+    int ret = 0;
+
+    while (*src) {
+        *dst = *src;
+        dst++;
+        src++;
+        ret++;
+    }
+
+    *dst = '\0';
+
+    return ret;
+}
+
 int atoi(const char *str)
 {
     int i = 0, tmp = 0;

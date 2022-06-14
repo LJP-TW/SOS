@@ -5,6 +5,7 @@
 #include <sched.h>
 #include <kthread.h>
 #include <mm/mm.h>
+#include <fs/vfs.h>
 
 // Change current EL to EL0 and execute the user program at @entry
 // Set user stack to @user_sp
@@ -34,17 +35,40 @@ static inline void pt_regs_init(struct pt_regs *regs)
 }
 
 // TODO: Add argv & envp
-void sched_new_user_prog(char *filename)
+void sched_new_user_prog(char *pathname)
 {
     void *data;
-    uint32 datalen;
+    int datalen, adj_datalen;
     task_struct *task;
+    struct file f;
+    int ret;
     
-    datalen = cpio_load_prog(initramfs_base, filename, (char **)&data);
+    ret = vfs_open(pathname, 0, &f);
 
-    if (datalen == 0) {
-        goto EXEC_USER_PROG_END;
+    if (ret < 0) {
+        return;
     }
+
+    datalen = f.vnode->v_ops->getsize(f.vnode);
+
+    if (datalen < 0) {
+        return;
+    }
+
+    adj_datalen = ALIGN(datalen, PAGE_SIZE);
+
+    data = kmalloc(adj_datalen);
+
+    memzero(data, adj_datalen);
+
+    ret = vfs_read(&f, data, datalen);
+
+    if (ret < 0) {
+        kfree(data);
+        return;
+    }
+
+    vfs_close(&f);
 
     task = task_create();
 
@@ -55,14 +79,11 @@ void sched_new_user_prog(char *filename)
 
     task_init_map(task);
 
-    // 0x000000000000 ~ <datalen>: rwx: Code
-    vma_map(task->address_space, (void *)0, datalen,
+    // 0x000000000000 ~ <adj_datalen>: rwx: Code
+    vma_map(task->address_space, (void *)0, adj_datalen,
            VMA_R | VMA_W | VMA_X | VMA_KVA, data);
 
     sched_add_task(task);
-
-EXEC_USER_PROG_END:
-    return;
 }
 
 void exit_user_prog(void)

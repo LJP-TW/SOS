@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <mm/mm.h>
 #include <mmu.h>
+#include <fs/vfs.h>
 
 #define KSTACK_VARIABLE(x)                      \
     (void *)((uint64)x -                        \
@@ -24,7 +25,7 @@ typedef void (*syscall_funcp)();
 void syscall_getpid(trapframe *_);
 void syscall_uart_read(trapframe *_, char buf[], size_t size);
 void syscall_uart_write(trapframe *_, const char buf[], size_t size);
-void syscall_exec(trapframe *_, const char* name, char *const argv[]);
+void syscall_exec(trapframe *_, const char *name, char *const argv[]);
 void syscall_fork(trapframe *_);
 void syscall_exit(trapframe *_);
 void syscall_mbox_call(trapframe *_, unsigned char ch, unsigned int *mbox);
@@ -43,8 +44,17 @@ syscall_funcp syscall_table[] = {
     (syscall_funcp) syscall_signal,     // 8
     (syscall_funcp) syscall_kill,
     (syscall_funcp) syscall_mmap,
-    (syscall_funcp) syscall_sigreturn,
-    (syscall_funcp) syscall_show_info,  // 12
+    (syscall_funcp) syscall_open,
+    (syscall_funcp) syscall_close,      // 12
+    (syscall_funcp) syscall_write,
+    (syscall_funcp) syscall_read,
+    (syscall_funcp) syscall_mkdir,
+    (syscall_funcp) syscall_mount,      // 16
+    (syscall_funcp) syscall_chdir,
+    (syscall_funcp) syscall_lseek64,
+    (syscall_funcp) syscall_ioctl,
+    (syscall_funcp) syscall_sigreturn,  // 20
+    (syscall_funcp) syscall_show_info,
 };
 
 void syscall_handler(trapframe *regs)
@@ -87,17 +97,40 @@ void syscall_uart_write(trapframe *_, const char buf[], size_t size)
 }
 
 // TODO: Passing argv
-void syscall_exec(trapframe *_, const char* name, char *const argv[])
+void syscall_exec(trapframe *_, const char *name, char *const argv[])
 {
     void *data;
     char *kernel_sp;
-    uint32 datalen;
+    int datalen, adj_datalen;
+    struct file f;
+    int ret;
     
-    datalen = cpio_load_prog(initramfs_base, name, (char **)&data);
+    ret = vfs_open(name, 0, &f);
 
-    if (datalen == 0) {
+    if (ret < 0) {
         return;
     }
+
+    datalen = f.vnode->v_ops->getsize(f.vnode);
+
+    if (datalen < 0) {
+        return;
+    }
+
+    adj_datalen = ALIGN(datalen, PAGE_SIZE);
+
+    data = kmalloc(adj_datalen);
+
+    memzero(data, adj_datalen);
+
+    ret = vfs_read(&f, data, datalen);
+
+    if (ret < 0) {
+        kfree(data);
+        return;
+    }
+
+    vfs_close(&f);
 
     // Use origin kernel stack
 
@@ -115,7 +148,7 @@ void syscall_exec(trapframe *_, const char* name, char *const argv[])
     task_init_map(current);
 
     // 0x000000000000 ~ <datalen>: rwx: Code
-    vma_map(current->address_space, (void *)0, datalen,
+    vma_map(current->address_space, (void *)0, adj_datalen,
            VMA_R | VMA_W | VMA_X | VMA_KVA, data);
 
     set_page_table(current->page_table);

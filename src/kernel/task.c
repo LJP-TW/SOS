@@ -52,6 +52,14 @@ task_struct *task_create(void)
     task->signal = signal;
     task->sighand = sighand;
 
+    task->work_dir = rootmount->root;
+
+    vfs_open("/dev/uart", 0, &task->fds[0]);
+    vfs_open("/dev/uart", 0, &task->fds[1]);
+    vfs_open("/dev/uart", 0, &task->fds[2]);
+
+    task->maxfd = 2;
+
     return task;
 }
 
@@ -69,7 +77,13 @@ void task_free(task_struct *task)
     pt_free(task->page_table);
 
     // TODO: release tid
-    
+
+    for (int i = 0; i <= task->maxfd; ++i) {
+        if (task->fds[i].vnode != NULL) {
+            vfs_close(&task->fds[i]);
+        }
+    }
+
     kfree(task);
 }
 

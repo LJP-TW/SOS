@@ -16,26 +16,12 @@
 #define GET_BOARD_REVISION  0x00010002
 #define GET_ARM_MEMORY      0x00010005
 
-/* Channels */
-#define MAILBOX_CH_POWER   0
-#define MAILBOX_CH_FB      1
-#define MAILBOX_CH_VUART   2
-#define MAILBOX_CH_VCHIQ   3
-#define MAILBOX_CH_LEDS    4
-#define MAILBOX_CH_BTNS    5
-#define MAILBOX_CH_TOUCH   6
-#define MAILBOX_CH_COUNT   7
-#define MAILBOX_CH_PROP    8
-
 /* Others */
 #define MAILBOX_EMPTY   0x40000000
 #define MAILBOX_FULL    0x80000000
 
-#define REQUEST_CODE        0x00000000
 #define REQUEST_SUCCEED     0x80000000
 #define REQUEST_FAILED      0x80000001
-#define TAG_REQUEST_CODE    0x00000000
-#define END_TAG             0x00000000
 
 // Aligned buffer
 static unsigned int __attribute__((aligned(0x10))) mailbox[16];
@@ -67,14 +53,14 @@ void mailbox_call(unsigned char channel, unsigned int *mb)
 unsigned int get_board_revision(void) 
 {
     mailbox[0] = 7 * 4;              // Buffer size in bytes
-    mailbox[1] = REQUEST_CODE;
+    mailbox[1] = MBOX_REQUEST_CODE;
     // Tags begin
     mailbox[2] = GET_BOARD_REVISION; // Tag identifier
     mailbox[3] = 4;                  // Value buffer size in bytes
-    mailbox[4] = TAG_REQUEST_CODE;   // Request/response codes
+    mailbox[4] = MBOX_TAG_REQUEST;   // Request/response codes
     mailbox[5] = 0;                  // Optional value buffer
     // Tags end
-    mailbox[6] = END_TAG;
+    mailbox[6] = MBOX_END_TAG;
 
     mailbox_call(MAILBOX_CH_PROP, mailbox); // Message passing procedure call
 
@@ -84,15 +70,15 @@ unsigned int get_board_revision(void)
 void get_arm_memory(struct arm_memory_info *info)
 {
     mailbox[0] = 8 * 4;              // Buffer size in bytes
-    mailbox[1] = REQUEST_CODE;
+    mailbox[1] = MBOX_REQUEST_CODE;
     // Tags begin
     mailbox[2] = GET_ARM_MEMORY;     // Tag identifier
     mailbox[3] = 8;                  // Value buffer size in bytes
-    mailbox[4] = TAG_REQUEST_CODE;   // Request/response codes
+    mailbox[4] = MBOX_TAG_REQUEST;   // Request/response codes
     mailbox[5] = 0;                  // Optional value buffer
     mailbox[6] = 0;                  // Optional value buffer
     // Tags end
-    mailbox[7] = END_TAG;
+    mailbox[7] = MBOX_END_TAG;
 
     mailbox_call(MAILBOX_CH_PROP, mailbox); // Message passing procedure call
 
