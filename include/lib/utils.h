@@ -6,11 +6,12 @@
 #ifndef __ASSEMBLER__
 
 void delay(uint64 cnt);
-void put32(uint64 addr, uint32 val);
+void put32(uint64 addr, const uint32 val);
 uint32 get32(uint64 addr);
 
-void memzero(char *src, unsigned long n);
-void memncpy(char *dst, const char *src, unsigned long n);
+void memzero(char *src, uint64 n);
+void memncpy(char *dst, const char *src, uint64 n);
+void memset(void *ptr, uint8 value, uint64 num);
 
 #endif /* __ASSEMBLER__ */
 

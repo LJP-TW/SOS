@@ -6,6 +6,7 @@
 #include <fs/cpiofs.h>
 #include <fs/uartfs.h>
 #include <fs/framebufferfs.h>
+#include <fs/fat32fs.h>
 
 void fs_init(void);
 

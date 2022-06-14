@@ -33,3 +33,15 @@ memncpy_1_cmp:
     bge memncpy_1
 memncpy_ok:
     ret
+
+.globl memset
+memset:
+    b memset_1_cmp
+memset_1:
+    strb w1, [x0], #1
+    subs x2, x2, #1
+memset_1_cmp:
+    cmp x2, 1
+    bge memset_1
+memset_ok:
+    ret
