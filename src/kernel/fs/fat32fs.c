@@ -116,6 +116,8 @@ struct fat_file_block_t {
     uint32 oid;
     /* cluster id */
     uint32 cid;
+    /* Already read the data into buf */
+    uint32 read;
     uint8 buf[BLOCK_SIZE];
 };
 
@@ -317,6 +319,8 @@ static struct vnode *_create_vnode(struct vnode *parent,
     node->parent = parent;
     node->internal = data;
 
+    list_add(&data->list, &info->dir->list);
+
     return node;
 }
 
@@ -325,6 +329,10 @@ static uint32 _get_next_cluster(uint32 fat_lba, uint32 cluster_id)
     struct cluster_entry_t *ce;
     uint32 cid;
     uint8 buf[BLOCK_SIZE];
+
+    if (cluster_id >= 0x0ffffff8) {
+        return cluster_id;
+    }
 
     fat_lba += cluster_id / CLUSTER_ENTRY_PER_BLOCK;
     cid = cluster_id % CLUSTER_ENTRY_PER_BLOCK;
@@ -482,7 +490,7 @@ static struct dir_t *__lookup_fat32(struct vnode *dir_node,
 
         cid = _get_next_cluster(fat->fat_lba, cid);
 
-        if (cid > 0x0ffffff8) {
+        if (cid >= 0x0ffffff8) {
             break;
         }
     }
@@ -499,7 +507,6 @@ static int _lookup_fat32(struct vnode *dir_node, struct vnode **target,
 {
     struct vnode *node;
     struct dir_t *dir;
-    struct fat_internal *data, *nodedata;
     uint32 type, cid;
     uint8 buf[BLOCK_SIZE];
 
@@ -522,11 +529,6 @@ static int _lookup_fat32(struct vnode *dir_node, struct vnode **target,
     }
 
     node = _create_vnode(dir_node, component_name, type, cid, dir->size);
-
-    data = dir_node->internal;
-    nodedata = node->internal;
-
-    list_add(&nodedata->list, &data->dir->list);
 
     *target = node;
 
@@ -557,15 +559,53 @@ static int fat32fs_lookup(struct vnode *dir_node, struct vnode **target,
 static int fat32fs_create(struct vnode *dir_node, struct vnode **target,
                           const char *component_name)
 {
-    // TODO
-    return -1;
+    struct vnode *node;
+    struct fat_internal *internal;
+    int ret;
+
+    internal = dir_node->internal;
+
+    if (internal->type != FAT_DIR) {
+        return -1;
+    }
+
+    ret = fat32fs_lookup(dir_node, target, component_name);
+
+    if (!ret) {
+        return -1;
+    }
+    
+    node = _create_vnode(dir_node, component_name, FAT_FILE, -1, 0);
+
+    *target = node;
+
+    return 0;
 }
 
 static int fat32fs_mkdir(struct vnode *dir_node, struct vnode **target,
                          const char *component_name)
 {
-    // TODO
-    return -1;
+    struct vnode *node;
+    struct fat_internal *internal;
+    int ret;
+
+    internal = dir_node->internal;
+
+    if (internal->type != FAT_DIR) {
+        return -1;
+    }
+
+    ret = fat32fs_lookup(dir_node, target, component_name);
+
+    if (!ret) {
+        return -1;
+    }
+    
+    node = _create_vnode(dir_node, component_name, FAT_DIR, -1, 0);
+
+    *target = node;
+
+    return 0;
 }
 
 static int fat32fs_isdir(struct vnode *dir_node)
@@ -607,63 +647,352 @@ static int fat32fs_getsize(struct vnode *dir_node)
 
 /* file_operations methods */
 
-static int fat32fs_write(struct file *file, const void *buf, size_t len)
+static int _writefile_seek_cache(struct fat_internal *data, uint32 foid,
+                                 struct fat_file_block_t **block)
 {
-    // TODO
-    return -1;
-}
-
-static int _readfile_cache(struct fat_internal *data, uint64 bckoff,
-                           uint8 *buf, uint64 bufoff,
-                           uint32 oid, uint32 size,
-                           struct list_head **iter,
-                           uint32 *cid)
-{
-    struct list_head *tmpiter;
-    struct fat_file_t *file;
     struct fat_file_block_t *entry;
-    int rsize;
+    struct list_head *head;
 
-    tmpiter = *iter;
-    file = data->file;
+    head = &data->file->list;
 
-    iter_for_each_entry(entry, tmpiter, &file->list, list) {
-        if (oid <= entry->oid) {
-            break;
-        }
-    }
-
-    if (&entry->list == &file->list) {
-        *iter = &entry->list;
+    if (list_empty(head)) {
         return -1;
     }
 
-    if (oid < entry->oid) {
-        *iter = &entry->list;
-        return -2;
+    list_for_each_entry(entry, head, list) {
+        *block = entry;
+
+        if (foid == entry->oid) {
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+static int _writefile_seek_fat32(struct fat_internal *data,
+                                 uint32 foid, uint32 fcid,
+                                 struct fat_file_block_t **block)
+{
+    struct fat_info_t *info;
+    uint32 curoid, curcid;
+
+    info = data->fat;
+    
+    if (*block) {
+        curoid = (*block)->oid;
+        curcid = (*block)->cid;
+
+        if (curoid == foid) {
+            return 0;
+        }
+
+        curoid++;
+        curcid = _get_next_cluster(info->fat_lba, curcid);
+    } else {
+        curoid = 0;
+        curcid = fcid;
+    }
+
+    while (1) {
+        struct fat_file_block_t *newblock;
+
+        newblock = kmalloc(sizeof(struct fat_file_block_t));
+
+        newblock->oid = curoid;
+        newblock->cid = curcid;
+        newblock->read = 0;
+
+        list_add_tail(&newblock->list, &data->file->list);
+
+        *block = newblock;
+
+        if (curoid == foid) {
+            return 0;
+        }
+
+        curoid++;
+        curcid = _get_next_cluster(info->fat_lba, curcid);
+    }
+}
+
+static int _writefile_cache(struct fat_internal *data, uint64 bckoff,
+                            const uint8 *buf, uint64 bufoff, uint32 size,
+                            struct fat_file_block_t *block)
+{
+    int wsize;
+
+    if (!block->read) {
+        // read the data from sdcard
+        struct fat_info_t *info;
+        int lba;
+        
+        info = data->fat;
+        lba = info->cluster_lba +
+              (block->cid - 2) * info->bs.sector_per_cluster;
+
+        sd_readblock(lba, block->buf);
+
+        block->read = 1;
+    }
+
+    wsize = size > BLOCK_SIZE - bckoff ? BLOCK_SIZE - bckoff : size;
+
+    memncpy((void *)&block->buf[bckoff], (void *)&buf[bufoff], wsize);
+
+    return wsize;
+}
+
+static int _writefile_fat32(struct fat_internal *data, uint64 bckoff,
+                            const uint8 *buf, uint32 bufoff, uint32 size,
+                            uint32 oid, uint32 cid)
+{
+    struct list_head *head;
+    struct fat_info_t *info;
+    struct fat_file_block_t *block;
+    int lba;
+    int wsize;
+
+    head = &data->file->list;
+    info = data->fat;
+
+    block = kmalloc(sizeof(struct fat_file_block_t));
+
+    wsize = size > BLOCK_SIZE - bckoff ? BLOCK_SIZE - bckoff : size;
+
+    if (cid >= 0x0ffffff8) {
+        memset(block->buf, 0, BLOCK_SIZE);
+    } else {
+        lba = info->cluster_lba + (cid - 2) * info->bs.sector_per_cluster;
+
+        sd_readblock(lba, block->buf);
+    }
+
+    memncpy((void *)&block->buf[bckoff], (void *)&buf[bufoff], wsize);
+
+    block->oid = oid;
+    block->cid = cid;
+    block->read = 1;
+    
+    list_add_tail(&block->list, head);
+
+    return wsize;
+}
+
+static int _writefile(const void *buf, struct fat_internal *data,
+                      uint64 fileoff, uint64 len)
+{
+    struct fat_file_block_t *block;
+    struct list_head *head;
+    uint32 foid; // first block id
+    uint32 coid; // current block id
+    uint32 cid;  // target cluster id
+    uint64 bufoff, result;
+    int ret;
+
+    block = NULL;
+    head = &data->file->list;
+    foid = fileoff / BLOCK_SIZE;
+    coid = 0;
+    cid = data->cid;
+    bufoff = 0;
+    result = 0;
+
+    // Seek
+
+    ret = _writefile_seek_cache(data, foid, &block);
+
+    if (ret < 0) {
+        ret = _writefile_seek_fat32(data, foid, cid, &block);
+    }
+
+    if (ret < 0) {
+        return 0;
+    }
+
+    // if (block->oid != foid) error!
+
+    // Write
+
+    while (len) {
+        uint64 bckoff;
+
+        bckoff = (fileoff + result) % BLOCK_SIZE;
+
+        if (&block->list != head) {
+            ret = _writefile_cache(data, bckoff, buf, bufoff, len, block);
+
+            cid = block->cid;
+            block = list_first_entry(&block->list,
+                                     struct fat_file_block_t, list);
+        } else {
+            // Read block from sdcard, create cache, then write it
+            cid = _get_next_cluster(data->fat->fat_lba, cid);
+
+            ret = _writefile_fat32(data, bckoff, buf, bufoff, len, coid, cid);
+        }
+
+        if (ret < 0) {
+            break;
+        }
+
+        bufoff += ret;
+        result += ret;
+        coid += 1;
+        len -= ret;
+    }
+
+    return result;
+}
+
+static int fat32fs_write(struct file *file, const void *buf, size_t len)
+{
+    struct fat_internal *data;
+    int filesize;
+    int ret;
+
+    if (fat32fs_isdir(file->vnode)) {
+        return -1;
+    }
+
+    if (!len) {
+        return len;
+    }
+
+    filesize = fat32fs_getsize(file->vnode);
+
+    data = file->vnode->internal;
+
+    ret = _writefile(buf, data, file->f_pos, len);
+
+    if (ret <= 0) {
+        return ret;
+    }
+
+    file->f_pos += ret;
+
+    if (file->f_pos > filesize) {
+        data->file->size = file->f_pos;
+    }
+
+    return ret;
+}
+
+static int _readfile_seek_cache(struct fat_internal *data, uint32 foid,
+                                struct fat_file_block_t **block)
+{
+    struct fat_file_block_t *entry;
+    struct list_head *head;
+
+    head = &data->file->list;
+
+    if (list_empty(head)) {
+        return -1;
+    }
+
+    list_for_each_entry(entry, head, list) {
+        *block = entry;
+
+        if (foid == entry->oid) {
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+static int _readfile_seek_fat32(struct fat_internal *data,
+                                uint32 foid, uint32 fcid,
+                                struct fat_file_block_t **block)
+{
+    struct fat_info_t *info;
+    uint32 curoid, curcid;
+
+    info = data->fat;
+    
+    if (*block) {
+        curoid = (*block)->oid;
+        curcid = (*block)->cid;
+
+        if (curoid == foid) {
+            return 0;
+        }
+
+        curoid++;
+        curcid = _get_next_cluster(info->fat_lba, curcid);
+
+        if (curcid >= 0x0ffffff8) {
+            return -1;
+        }
+    } else {
+        curoid = 0;
+        curcid = fcid;
+    }
+
+    while (1) {
+        struct fat_file_block_t *newblock;
+
+        newblock = kmalloc(sizeof(struct fat_file_block_t));
+
+        newblock->oid = curoid;
+        newblock->cid = curcid;
+        newblock->read = 0;
+
+        list_add_tail(&newblock->list, &data->file->list);
+
+        *block = newblock;
+
+        if (curoid == foid) {
+            return 0;
+        }
+
+        curoid++;
+        curcid = _get_next_cluster(info->fat_lba, curcid);
+
+        if (curcid >= 0x0ffffff8) {
+            return -1;
+        }
+    }
+}
+
+static int _readfile_cache(struct fat_internal *data, uint64 bckoff,
+                           uint8 *buf, uint64 bufoff, uint32 size,
+                           struct fat_file_block_t *block)
+{
+    int rsize;
+
+    if (!block->read) {
+        // read the data from sdcard
+        struct fat_info_t *info;
+        int lba;
+        
+        info = data->fat;
+        lba = info->cluster_lba +
+              (block->cid - 2) * info->bs.sector_per_cluster;
+
+        sd_readblock(lba, block->buf);
+
+        block->read = 1;
     }
 
     rsize = size > BLOCK_SIZE - bckoff ? BLOCK_SIZE - bckoff : size;
 
-    memncpy((void *)&buf[bufoff], (void *)&entry->buf[bckoff], rsize);
+    memncpy((void *)&buf[bufoff], (void *)&block->buf[bckoff], rsize);
 
-    *cid = entry->cid;
-
-    *iter = &entry->list;
     return rsize;
 }
 
 static int _readfile_fat32(struct fat_internal *data, uint64 bckoff,
-                           uint8 *buf, uint32 bufoff,
-                           uint32 oid, uint32 size,
-                           struct list_head *list,
-                           uint32 cid)
+                           uint8 *buf, uint32 bufoff, uint32 size,
+                           uint32 oid, uint32 cid)
 {
+    struct list_head *head;
     struct fat_info_t *info;
     struct fat_file_block_t *block;
     int lba;
     int rsize;
 
+    head = &data->file->list;
     info = data->fat;
 
     block = kmalloc(sizeof(struct fat_file_block_t));
@@ -677,8 +1006,9 @@ static int _readfile_fat32(struct fat_internal *data, uint64 bckoff,
 
     block->oid = oid;
     block->cid = cid;
+    block->read = 1;
     
-    list_add_tail(&block->list, list);
+    list_add_tail(&block->list, head);
 
     return rsize;
 }
@@ -686,55 +1016,58 @@ static int _readfile_fat32(struct fat_internal *data, uint64 bckoff,
 static int _readfile(void *buf, struct fat_internal *data,
                      uint64 fileoff, uint64 len)
 {
-    struct list_head *iter;
-    uint32 oid, cid;
+    struct fat_file_block_t *block;
+    struct list_head *head;
+    uint32 foid; // first block id
+    uint32 coid; // current block id
+    uint32 cid;  // target cluster id
     uint64 bufoff, result;
-    int cache_end;
+    int ret;
 
-    iter = &data->file->list;
-    oid = fileoff / BLOCK_SIZE;
-    cid = 0;
+    block = NULL;
+    head = &data->file->list;
+    foid = fileoff / BLOCK_SIZE;
+    coid = 0;
+    cid = data->cid;
     bufoff = 0;
     result = 0;
-    cache_end = list_empty(iter);
 
-    if (!cache_end) {
-        iter = iter->next;
+    // Seek
+
+    ret = _readfile_seek_cache(data, foid, &block);
+
+    if (ret < 0) {
+        ret = _readfile_seek_fat32(data, foid, cid, &block);
     }
+
+    if (ret < 0) {
+        return 0;
+    }
+
+    // if (block->oid != foid) error!
+
+    // Read
 
     while (len) {
         uint64 bckoff;
-        int cache_hit, ret;
 
         bckoff = (fileoff + result) % BLOCK_SIZE;
-        cache_hit = 0;
 
-        if (!cache_end) {
-            // Search cache
-            ret = _readfile_cache(data, bckoff, buf, bufoff,
-                                  oid, len, &iter, &cid);
+        if (&block->list != head) {
+            ret = _readfile_cache(data, bckoff, buf, bufoff, len, block);
 
-            if (ret == -1) {
-                cache_end = 1;
-            } else if (ret > 0) {
-                cache_hit = 1;
-            }
-        }
-
-        if (!cache_hit) {
+            cid = block->cid;
+            block = list_first_entry(&block->list,
+                                     struct fat_file_block_t, list);
+        } else {
             // Read block from sdcard, create cache
-            if (!cid) {
-                cid = data->cid;
-            } else {
-                cid = _get_next_cluster(data->fat->fat_lba, cid);
-            }
+            cid = _get_next_cluster(data->fat->fat_lba, cid);
 
-            if (cid > 0x0ffffff8) {
+            if (cid >= 0x0ffffff8) {
                 break;
             }
 
-            ret = _readfile_fat32(data, bckoff, buf, bufoff,
-                                  oid, len, iter, cid);
+            ret = _readfile_fat32(data, bckoff, buf, bufoff, len, coid, cid);
         }
 
         if (ret < 0) {
@@ -743,7 +1076,7 @@ static int _readfile(void *buf, struct fat_internal *data,
 
         bufoff += ret;
         result += ret;
-        oid += 1;
+        coid += 1;
         len -= ret;
     }
 
