@@ -8,10 +8,12 @@ struct uartfs_internal {
 };
 
 static int uartfs_mount(struct filesystem *fs, struct mount *mount);
+static int uartfs_sync(struct filesystem *fs);
 
 static struct filesystem uartfs = {
     .name = "uartfs",
-    .mount = uartfs_mount
+    .mount = uartfs_mount,
+    .sync = uartfs_sync
 };
 
 static int uartfs_lookup(struct vnode *dir_node, struct vnode **target,
@@ -75,6 +77,11 @@ static int uartfs_mount(struct filesystem *fs, struct mount *mount)
     oldnode->f_ops = &uartfs_f_ops;
     oldnode->internal = internal;
 
+    return 0;
+}
+
+static int uartfs_sync(struct filesystem *fs)
+{
     return 0;
 }
 

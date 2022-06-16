@@ -40,6 +40,7 @@ struct filesystem {
     struct list_head fs_list;
     int (*mount)(struct filesystem *fs, struct mount *mount);
     int (*alloc_vnode)(struct filesystem *fs, struct vnode **target);
+    int (*sync)(struct filesystem *fs);
 };
 
 struct file_operations {
@@ -78,6 +79,7 @@ int vfs_ioctl(struct file *file, uint64 request, va_list args);
 int vfs_mkdir(const char *pathname);
 int vfs_mount(const char *mountpath, const char *filesystem);
 int vfs_lookup(const char *pathname, struct vnode **target);
+int vfs_sync(struct filesystem *fs);
 
 void syscall_open(trapframe *frame, const char *pathname, int flags);
 void syscall_close(trapframe *frame, int fd);
@@ -89,5 +91,6 @@ void syscall_mount(trapframe *frame, const char *src, const char *target,
 void syscall_chdir(trapframe *frame, const char *path);
 void syscall_lseek64(trapframe *frame, int fd, int64 offset, int whence);
 void syscall_ioctl(trapframe *frame, int fd, uint64 request, ...);
+void syscall_sync(trapframe *frame);
 
 #endif /* _VFS_H */

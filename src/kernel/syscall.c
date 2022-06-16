@@ -53,7 +53,8 @@ syscall_funcp syscall_table[] = {
     (syscall_funcp) syscall_chdir,
     (syscall_funcp) syscall_lseek64,
     (syscall_funcp) syscall_ioctl,
-    (syscall_funcp) syscall_sigreturn,  // 20
+    (syscall_funcp) syscall_sync,       // 20
+    (syscall_funcp) syscall_sigreturn,
     (syscall_funcp) syscall_show_info,
 };
 

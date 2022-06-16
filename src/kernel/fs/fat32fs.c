@@ -4,10 +4,12 @@
 #include <panic.h>
 #include <utils.h>
 #include <string.h>
+#include <preempt.h>
 
 #define BLOCK_SIZE 512
 #define CLUSTER_ENTRY_PER_BLOCK (BLOCK_SIZE / sizeof(struct cluster_entry_t))
 #define DIR_PER_BLOCK (BLOCK_SIZE / sizeof(struct dir_t))
+#define INVALID_CID 0x0ffffff8
 
 struct partition_t {
     uint8 status;
@@ -57,6 +59,7 @@ struct boot_sector_t {
 #define ATTR_HIDDEN     0x02
 #define ATTR_SYSTEM     0x04
 #define ATTR_VOLUME_ID  0x08
+#define ATTR_LFN        0x0f
 #define ATTR_DIRECTORY  0x10
 #define ATTR_ARCHIVE    0x20
 #define ATTR_FILE_DIR_MASK (ATTR_DIRECTORY | ATTR_ARCHIVE)
@@ -118,6 +121,7 @@ struct fat_file_block_t {
     uint32 cid;
     /* Already read the data into buf */
     uint32 read;
+    uint32 dirty;
     uint8 buf[BLOCK_SIZE];
 };
 
@@ -157,11 +161,22 @@ struct fat_internal {
     };
 };
 
+struct fat_mount_t {
+    /* Link fat_mount_t */
+    struct list_head list;
+    struct mount *mount;
+};
+
+/* Head of fat_mount_t chain */
+static struct list_head mounts;
+
 static int fat32fs_mount(struct filesystem *fs, struct mount *mount);
+static int fat32fs_sync(struct filesystem *fs);
 
 static struct filesystem fat32fs = {
     .name = "fat32fs",
-    .mount = fat32fs_mount
+    .mount = fat32fs_mount,
+    .sync = fat32fs_sync
 };
 
 static int fat32fs_lookup(struct vnode *dir_node, struct vnode **target,
@@ -199,6 +214,14 @@ static struct file_operations fat32fs_f_ops = {
     .ioctl = fat32fs_ioctl
 };
 
+static uint32 get_next_cluster(uint32 fat_lba, uint32 cluster_id);
+// TODO: Check alloc_cluster ok
+static uint32 alloc_cluster(struct fat_info_t *fat, uint32 prev_cid);
+static int invalid_cid(uint32 cid);
+static struct dir_t *__lookup_fat32(struct vnode *dir_node,
+                                    const char *component_name,
+                                    uint8 *buf, int *buflba);
+
 /* filesystem methods */
 
 static int fat32fs_mount(struct filesystem *fs, struct mount *mount)
@@ -208,6 +231,7 @@ static int fat32fs_mount(struct filesystem *fs, struct mount *mount)
     struct fat_dir_t *dir;
     struct fat_internal *data;
     struct vnode *oldnode, *node;
+    struct fat_mount_t *newmount;
     const char *name;
     uint32 lba;
     uint8 buf[BLOCK_SIZE];
@@ -232,6 +256,7 @@ static int fat32fs_mount(struct filesystem *fs, struct mount *mount)
     data = kmalloc(sizeof(struct fat_internal));
     fat = kmalloc(sizeof(struct fat_info_t));
     dir = kmalloc(sizeof(struct fat_dir_t));
+    newmount = kmalloc(sizeof(struct fat_mount_t));
 
     memncpy((void *)&fat->bs, (void *)buf, sizeof(fat->bs));
 
@@ -262,6 +287,386 @@ static int fat32fs_mount(struct filesystem *fs, struct mount *mount)
     oldnode->v_ops = &fat32fs_v_ops;
     oldnode->f_ops = &fat32fs_f_ops;
     oldnode->internal = data;
+
+    preempt_disable();
+
+    list_add(&newmount->list, &mounts);
+
+    preempt_enable();
+
+    newmount->mount = mount;
+
+    return 0;
+}
+
+static void _do_sync_dir(struct vnode *dirnode)
+{
+    struct fat_internal *data, *entry;
+    struct list_head *head;
+    struct dir_t *dir;
+    struct long_dir_t *ldir;
+    uint32 cid;
+    int lba, idx, lfnidx;
+    uint8 buf[BLOCK_SIZE];
+
+    data = dirnode->internal;
+    head = &data->dir->list;
+    cid = data->cid;
+    idx = 0;
+    lfnidx = 1;
+
+    if (invalid_cid(cid)) {
+        panic("fat32 _do_sync_dir: invalid dirnode->data->cid");
+    }
+
+    lba = data->fat->cluster_lba +
+          (cid - 2) * data->fat->bs.sector_per_cluster;
+
+    // TODO: Cache data block of directory
+    sd_readblock(lba, buf);
+
+    list_for_each_entry(entry, head, list) {
+        struct dir_t *origindir;
+        const char *name;
+        const char *ext;
+        int lfn, namelen, extpos, i, buflba;
+        uint8 lookupbuf[BLOCK_SIZE];
+
+        name = entry->name;
+
+        // If entry is a old file, update its size
+        origindir = __lookup_fat32(dirnode, name, lookupbuf, &buflba);
+
+        if (origindir) {
+            if (entry->type == FAT_FILE) {
+                origindir->size = entry->file->size;
+                sd_writeblock(buflba, lookupbuf);
+            }
+            
+            continue;
+        }
+
+        // Else if entry is a new file
+        ext = NULL;
+        extpos = -1;
+
+        do {
+            namelen = strlen(name);
+
+            if (namelen >= 13) {
+                lfn = 1;
+                break;
+            }
+
+            for (i = 0; i < namelen; ++i) {
+                if (name[namelen - 1 - i] == '.') {
+                    break;
+                }
+            }
+
+            if (i < namelen) {
+                ext = &name[namelen - i];
+                extpos = namelen - 1 - i;
+            }
+
+            if (i >= 4) {
+                lfn = 1;
+                break;
+            }
+
+            if (namelen - 1 - i > 8) {
+                lfn = 1;
+                break;
+            }
+
+            lfn = 0;
+        } while(0);
+
+        // Seek idx to the end of dir
+        while (1) {
+            dir = (struct dir_t *)(&buf[sizeof(struct dir_t) * idx]);
+
+            if (dir->name[0] == 0) {
+                break;
+            }
+
+            idx += 1;
+
+            if (idx >= 16) {
+                uint32 newcid;
+
+                sd_writeblock(lba, buf);
+
+                newcid = get_next_cluster(data->fat->fat_lba, cid);
+                if (invalid_cid(newcid)) {
+                    newcid = alloc_cluster(data->fat, cid);
+                }
+
+                cid = newcid;
+
+                lba = data->fat->cluster_lba +
+                      (cid - 2) * data->fat->bs.sector_per_cluster;
+
+                // TODO: Cache data block of directory
+                sd_readblock(lba, buf);
+
+                idx = 0;
+            }
+        }
+
+        // Write LFN
+        if (lfn) {
+            int ord;
+            int first;
+
+            ord = ((namelen - 1) / 13) + 1;
+            first = 0x40;
+
+            for (; ord > 0; --ord) {
+                int end;
+
+                ldir = (struct long_dir_t *)
+                       (&buf[sizeof(struct long_dir_t) * idx]);
+                
+                ldir->order = first | ord;
+                ldir->attr = ATTR_LFN;
+                ldir->type = 0;
+                // TODO: Calculate checksum
+                ldir->checksum = 0;
+                ldir->fstcluslo = 0;
+
+                first = 0;
+                end = 0;
+
+                for (i = 0; i < 10; i += 2) {
+                    if (end) {
+                        ldir->name1[i] = 0xff;
+                        ldir->name1[i + 1] = 0xff;
+                    } else {
+                        ldir->name1[i] = name[(ord - 1) * 13 + i / 2];
+                        ldir->name1[i + 1] = 0;
+                        if (ldir->name1[i] == 0) {
+                            end = 1;
+                        }
+                    }
+                }
+                for (i = 0; i < 12; i += 2) {
+                    if (end) {
+                        ldir->name2[i] = 0xff;
+                        ldir->name2[i + 1] = 0xff;
+                    } else {
+                        ldir->name2[i] = name[(ord - 1) * 13 + 5 + i / 2];
+                        ldir->name2[i + 1] = 0;
+                        if (ldir->name2[i] == 0) {
+                            end = 1;
+                        }
+                    }
+                }
+                for (i = 0; i < 4; i += 2) {
+                    if (end) {
+                        ldir->name3[i] = 0xff;
+                        ldir->name3[i + 1] = 0xff;
+                    } else {
+                        ldir->name3[i] = name[(ord - 1) * 13 + 11 + i / 2];
+                        ldir->name3[i + 1] = 0;
+                        if (ldir->name3[i] == 0) {
+                            end = 1;
+                        }
+                    }
+                }
+
+                idx += 1;
+
+                if (idx >= 16) {
+                    uint32 newcid;
+
+                    sd_writeblock(lba, buf);
+
+                    newcid = get_next_cluster(data->fat->fat_lba, cid);
+                    if (invalid_cid(newcid)) {
+                        newcid = alloc_cluster(data->fat, cid);
+                    }
+
+                    cid = newcid;
+
+                    lba = data->fat->cluster_lba +
+                          (cid - 2) * data->fat->bs.sector_per_cluster;
+
+                    // TODO: Cache data block of directory
+                    sd_readblock(lba, buf);
+
+                    idx = 0;
+                }
+            }
+        }
+
+        // Write SFN
+        dir = (struct dir_t *)(&buf[sizeof(struct dir_t) * idx]);
+
+        // TODO: Set these properties properly
+        dir->ntres = 0;
+        dir->crttimetenth = 0;
+        dir->crttime = 0;
+        dir->crtdate = 0;
+        dir->lstaccdate = 0;
+        dir->wrttime = 0;
+        dir->wrtdate = 0;
+
+        if (entry->type == FAT_DIR) {
+            dir->attr = ATTR_DIRECTORY;
+            dir->size = 0;
+        } else {
+            dir->attr = ATTR_ARCHIVE;
+            dir->size = entry->file->size;
+        }
+
+        if (invalid_cid(entry->cid)) {
+            entry->cid = alloc_cluster(data->fat, 0);
+        }
+
+        dir->ch = (entry->cid >> 16) & 0xffff;
+        dir->cl = entry->cid & 0xffff;
+
+        if (lfn) {
+            int lfni;
+
+            // TODO: handle lfnidx
+            for (i = 7, lfni = lfnidx; i >= 0 && lfni;) {
+                dir->name[i--] = '0' + lfni % 10;
+                lfni /= 10;
+            }
+
+            lfnidx++;
+
+            dir->name[i--] = '~';
+
+            // TODO: handle letter case
+            memncpy((void *)dir->name, name, i + 1);
+        } else {
+            // TODO: handle letter case
+            for (i = 0; i != extpos && name[i]; ++i) {
+                dir->name[i] = name[i];
+            }
+
+            for (; i < 8; ++i) {
+                dir->name[i] = ' ';
+            }
+        }
+
+        // TODO: handle letter case
+        for (i = 0; i < 3 && ext[i]; ++i) {
+            dir->name[8 + i] = ext[i];
+        }
+
+        for (; i < 3; ++i) {
+            dir->name[8 + i] = ' ';
+        }
+
+        idx += 1;
+
+        if (idx >= 16) {
+            int newcid;
+
+            sd_writeblock(lba, buf);
+
+            newcid = get_next_cluster(data->fat->fat_lba, cid);
+            if (invalid_cid(newcid)) {
+                newcid = alloc_cluster(data->fat, cid);
+            }
+
+            cid = newcid;
+
+            lba = data->fat->cluster_lba +
+                  (cid - 2) * data->fat->bs.sector_per_cluster;
+
+            // TODO: Cache data block of directory
+            sd_readblock(lba, buf);
+
+            idx = 0;
+        }
+    }
+
+    if (idx) {
+        sd_writeblock(lba, buf);
+    }
+}
+
+static void _do_sync_file(struct vnode *filenode)
+{
+    struct fat_file_block_t *entry;
+    struct fat_internal *data;
+    struct list_head *head;
+    uint32 cid;
+
+    data = filenode->internal;
+    head = &data->file->list;
+    cid = data->cid;
+
+    if (invalid_cid(cid)) {
+        panic("fat32 _do_sync_file: invalid cid");
+    }
+
+    list_for_each_entry(entry, head, list) {
+        int lba;
+
+        if (entry->oid == 0) {
+            if (!invalid_cid(entry->cid) && data->cid != entry->cid) {
+                panic("_do_sync_file: cid isn't sync");
+            }
+
+            entry->cid = data->cid;
+        }
+
+        if (invalid_cid(entry->cid)) {
+            entry->cid = alloc_cluster(data->fat, cid);
+        }
+
+        if (!entry->dirty) {
+            continue;
+        }
+
+        if (!entry->read) {
+            memset(entry->buf, 0, BLOCK_SIZE);
+            entry->read = 1;
+        }
+
+        lba = data->fat->cluster_lba +
+          (entry->cid - 2) * data->fat->bs.sector_per_cluster;
+
+        sd_writeblock(lba, entry->buf);
+
+        entry->dirty = 0;
+
+        cid = entry->cid;
+    }
+}
+
+static void _sync_dir(struct vnode *dirnode)
+{
+    struct fat_internal *data, *entry;
+    struct list_head *head;
+
+    data = dirnode->internal;
+    head = &data->dir->list;
+
+    _do_sync_dir(dirnode);
+
+    list_for_each_entry(entry, head, list) {
+        if (entry->type == FAT_DIR) {
+            _sync_dir(entry->node);
+        } else {
+            _do_sync_file(entry->node);
+        }
+    }
+}
+
+static int fat32fs_sync(struct filesystem *fs)
+{
+    struct fat_mount_t *entry;
+
+    list_for_each_entry(entry, &mounts, list) {
+        _sync_dir(entry->mount->root);
+    }
 
     return 0;
 }
@@ -324,27 +729,6 @@ static struct vnode *_create_vnode(struct vnode *parent,
     return node;
 }
 
-static uint32 _get_next_cluster(uint32 fat_lba, uint32 cluster_id)
-{
-    struct cluster_entry_t *ce;
-    uint32 cid;
-    uint8 buf[BLOCK_SIZE];
-
-    if (cluster_id >= 0x0ffffff8) {
-        return cluster_id;
-    }
-
-    fat_lba += cluster_id / CLUSTER_ENTRY_PER_BLOCK;
-    cid = cluster_id % CLUSTER_ENTRY_PER_BLOCK;
-    
-    // TODO: Cache FAT
-    sd_readblock(fat_lba, buf);
-
-    ce = &(((struct cluster_entry_t *)buf)[cid]);
-
-    return ce->val;
-}
-
 static int _lookup_cache(struct vnode *dir_node, struct vnode **target,
                          const char *component_name)
 {
@@ -375,7 +759,7 @@ static int _lookup_cache(struct vnode *dir_node, struct vnode **target,
 
 static struct dir_t *__lookup_fat32(struct vnode *dir_node,
                                     const char *component_name,
-                                    uint8 *buf)
+                                    uint8 *buf, int *buflba)
 {
     struct dir_t *dir;
     struct fat_internal *data;
@@ -401,6 +785,10 @@ static struct dir_t *__lookup_fat32(struct vnode *dir_node,
         // TODO: Cache data block of directory
         sd_readblock(lba, buf);
 
+        if (buflba) {
+            *buflba = lba;
+        }
+
         for (int i = 0; i < DIR_PER_BLOCK; ++i) {
             uint8 len;
 
@@ -411,7 +799,7 @@ static struct dir_t *__lookup_fat32(struct vnode *dir_node,
                 break;
             }
 
-            if ((dir->attr & 0xf) == 0xf) {
+            if ((dir->attr & ATTR_LFN) == ATTR_LFN) {
                 struct long_dir_t *ldir;
                 int n;
 
@@ -488,9 +876,9 @@ static struct dir_t *__lookup_fat32(struct vnode *dir_node,
             break;
         }
 
-        cid = _get_next_cluster(fat->fat_lba, cid);
+        cid = get_next_cluster(fat->fat_lba, cid);
 
-        if (cid >= 0x0ffffff8) {
+        if (invalid_cid(cid)) {
             break;
         }
     }
@@ -510,7 +898,7 @@ static int _lookup_fat32(struct vnode *dir_node, struct vnode **target,
     uint32 type, cid;
     uint8 buf[BLOCK_SIZE];
 
-    dir = __lookup_fat32(dir_node, component_name, buf);
+    dir = __lookup_fat32(dir_node, component_name, buf, NULL);
 
     if (!dir) {
         return -1;
@@ -688,7 +1076,7 @@ static int _writefile_seek_fat32(struct fat_internal *data,
         }
 
         curoid++;
-        curcid = _get_next_cluster(info->fat_lba, curcid);
+        curcid = get_next_cluster(info->fat_lba, curcid);
     } else {
         curoid = 0;
         curcid = fcid;
@@ -702,6 +1090,7 @@ static int _writefile_seek_fat32(struct fat_internal *data,
         newblock->oid = curoid;
         newblock->cid = curcid;
         newblock->read = 0;
+        newblock->dirty = 1;
 
         list_add_tail(&newblock->list, &data->file->list);
 
@@ -712,7 +1101,7 @@ static int _writefile_seek_fat32(struct fat_internal *data,
         }
 
         curoid++;
-        curcid = _get_next_cluster(info->fat_lba, curcid);
+        curcid = get_next_cluster(info->fat_lba, curcid);
     }
 }
 
@@ -760,7 +1149,7 @@ static int _writefile_fat32(struct fat_internal *data, uint64 bckoff,
 
     wsize = size > BLOCK_SIZE - bckoff ? BLOCK_SIZE - bckoff : size;
 
-    if (cid >= 0x0ffffff8) {
+    if (invalid_cid(cid)) {
         memset(block->buf, 0, BLOCK_SIZE);
     } else {
         lba = info->cluster_lba + (cid - 2) * info->bs.sector_per_cluster;
@@ -773,6 +1162,7 @@ static int _writefile_fat32(struct fat_internal *data, uint64 bckoff,
     block->oid = oid;
     block->cid = cid;
     block->read = 1;
+    block->dirty = 1;
     
     list_add_tail(&block->list, head);
 
@@ -827,7 +1217,7 @@ static int _writefile(const void *buf, struct fat_internal *data,
                                      struct fat_file_block_t, list);
         } else {
             // Read block from sdcard, create cache, then write it
-            cid = _get_next_cluster(data->fat->fat_lba, cid);
+            cid = get_next_cluster(data->fat->fat_lba, cid);
 
             ret = _writefile_fat32(data, bckoff, buf, bufoff, len, coid, cid);
         }
@@ -919,9 +1309,9 @@ static int _readfile_seek_fat32(struct fat_internal *data,
         }
 
         curoid++;
-        curcid = _get_next_cluster(info->fat_lba, curcid);
+        curcid = get_next_cluster(info->fat_lba, curcid);
 
-        if (curcid >= 0x0ffffff8) {
+        if (invalid_cid(curcid)) {
             return -1;
         }
     } else {
@@ -937,6 +1327,7 @@ static int _readfile_seek_fat32(struct fat_internal *data,
         newblock->oid = curoid;
         newblock->cid = curcid;
         newblock->read = 0;
+        newblock->dirty = 0;
 
         list_add_tail(&newblock->list, &data->file->list);
 
@@ -947,9 +1338,9 @@ static int _readfile_seek_fat32(struct fat_internal *data,
         }
 
         curoid++;
-        curcid = _get_next_cluster(info->fat_lba, curcid);
+        curcid = get_next_cluster(info->fat_lba, curcid);
 
-        if (curcid >= 0x0ffffff8) {
+        if (invalid_cid(curcid)) {
             return -1;
         }
     }
@@ -1007,6 +1398,7 @@ static int _readfile_fat32(struct fat_internal *data, uint64 bckoff,
     block->oid = oid;
     block->cid = cid;
     block->read = 1;
+    block->dirty = 0;
     
     list_add_tail(&block->list, head);
 
@@ -1061,9 +1453,9 @@ static int _readfile(void *buf, struct fat_internal *data,
                                      struct fat_file_block_t, list);
         } else {
             // Read block from sdcard, create cache
-            cid = _get_next_cluster(data->fat->fat_lba, cid);
+            cid = get_next_cluster(data->fat->fat_lba, cid);
 
-            if (cid >= 0x0ffffff8) {
+            if (invalid_cid(cid)) {
                 break;
             }
 
@@ -1179,7 +1571,99 @@ static int fat32fs_ioctl(struct file *file, uint64 request, va_list args)
 
 /* Others */
 
+static uint32 get_next_cluster(uint32 fat_lba, uint32 cluster_id)
+{
+    struct cluster_entry_t *ce;
+    uint32 idx;
+    uint8 buf[BLOCK_SIZE];
+
+    if (invalid_cid(cluster_id)) {
+        return cluster_id;
+    }
+
+    fat_lba += cluster_id / CLUSTER_ENTRY_PER_BLOCK;
+    idx = cluster_id % CLUSTER_ENTRY_PER_BLOCK;
+    
+    // TODO: Cache FAT
+    sd_readblock(fat_lba, buf);
+
+    ce = &(((struct cluster_entry_t *)buf)[idx]);
+
+    return ce->val;
+}
+
+static uint32 alloc_cluster(struct fat_info_t *fat, uint32 prev_cid)
+{
+    struct cluster_entry_t *ce;
+    uint32 fat_lba;
+    uint32 cid;
+    int found;
+    uint8 buf[BLOCK_SIZE];
+
+    fat_lba = fat->fat_lba;
+    cid = 0;
+
+    while (fat_lba < fat->cluster_lba) {
+        found = 0;
+
+        // TODO: Cache FAT
+        sd_readblock(fat_lba, buf);
+
+        for (int i = 0; i < CLUSTER_ENTRY_PER_BLOCK; ++i) {
+            ce = &(((struct cluster_entry_t *)buf)[i]);
+
+            if (!ce->val) {
+                found = 1;
+                break;
+            }
+
+            ++cid;
+        }
+
+        if (found) {
+            break;
+        }
+
+        fat_lba += 1;
+    }
+
+    if (found && prev_cid) {
+        uint32 target_lba;
+        uint32 target_idx;
+
+        target_lba = fat_lba + prev_cid / CLUSTER_ENTRY_PER_BLOCK;
+        target_idx = prev_cid % CLUSTER_ENTRY_PER_BLOCK;
+
+        // TODO: Cache FAT
+        sd_readblock(target_lba, buf);
+        
+        ce = &(((struct cluster_entry_t *)buf)[target_idx]);
+
+        ce->val = cid;
+
+        sd_writeblock(target_lba, buf);
+    }
+
+    if (!found) {
+        panic("fat32 alloc_cluster: No space!");
+        return -1;
+    }
+
+    return cid;
+}
+
+static int invalid_cid(uint32 cid)
+{
+    if (cid >= INVALID_CID) {
+        return 1;
+    }
+
+    return 0;
+}
+
 struct filesystem *fat32fs_init(void)
 {
+    INIT_LIST_HEAD(&mounts);
+
     return &fat32fs;
 }

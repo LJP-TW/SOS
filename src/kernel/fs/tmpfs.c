@@ -36,11 +36,13 @@ struct tmpfs_internal {
 
 static int tmpfs_mount(struct filesystem *fs, struct mount *mount);
 static int tmpfs_alloc_vnode(struct filesystem *fs, struct vnode **target);
+static int tmpfs_sync(struct filesystem *fs);
 
 static struct filesystem tmpfs = {
     .name = "tmpfs",
     .mount = tmpfs_mount,
-    .alloc_vnode = tmpfs_alloc_vnode
+    .alloc_vnode = tmpfs_alloc_vnode,
+    .sync = tmpfs_sync
 };
 
 static int tmpfs_lookup(struct vnode *dir_node, struct vnode **target,
@@ -143,6 +145,11 @@ static int tmpfs_alloc_vnode(struct filesystem *fs, struct vnode **target)
 
     *target = node;
 
+    return 0;
+}
+
+static int tmpfs_sync(struct filesystem *fs)
+{
     return 0;
 }
 
