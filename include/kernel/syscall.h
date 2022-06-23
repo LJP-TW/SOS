@@ -23,8 +23,9 @@
 #define SCNUM_CHDIR         17
 #define SCNUM_LSEEK64       18
 #define SCNUM_IOCTL         19
-#define SCNUM_SIGRETURN     20
-#define SCNUM_SHOW_INFO     21
+#define SCNUM_SYNC          20
+#define SCNUM_SIGRETURN     21
+#define SCNUM_SHOW_INFO     22
 
 void syscall_handler(trapframe *regs);
 

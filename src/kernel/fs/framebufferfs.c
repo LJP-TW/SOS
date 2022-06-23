@@ -24,10 +24,12 @@ struct fbfs_internal {
 };
 
 static int fbfs_mount(struct filesystem *fs, struct mount *mount);
+static int fbfs_sync(struct filesystem *fs);
 
 static struct filesystem fbfs = {
     .name = "framebufferfs",
-    .mount = fbfs_mount
+    .mount = fbfs_mount,
+    .sync = fbfs_sync
 };
 
 static int fbfs_lookup(struct vnode *dir_node, struct vnode **target,
@@ -94,6 +96,11 @@ static int fbfs_mount(struct filesystem *fs, struct mount *mount)
     oldnode->f_ops = &fbfs_f_ops;
     oldnode->internal = internal;
 
+    return 0;
+}
+
+static int fbfs_sync(struct filesystem *fs)
+{
     return 0;
 }
 

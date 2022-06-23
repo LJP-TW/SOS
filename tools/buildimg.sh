@@ -28,7 +28,7 @@ sudo mkfs.vfat -F 32 ${LOOPBACK}p1
 sudo mount ${LOOPBACK}p1 mnt
 
 echo "[*] Copy the necessary files to $2 ..."
-sudo cp img/* mnt
+sudo cp -r img/* mnt
 
 echo "[*] Copy booting image $1 to $2 ..."
 sudo cp $1 mnt/bootloader.img

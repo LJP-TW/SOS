@@ -295,7 +295,7 @@ void start_kernel(char *fdt)
 
     // TODO: Add argv & envp
     // First user program
-    sched_new_user_prog("/initramfs/vfs1.img");
+    sched_new_user_prog("/initramfs/vfs2.img");
 
     // Enable interrupt from Auxiliary peripherals
     irq1_enable(29);

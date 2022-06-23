@@ -398,6 +398,22 @@ static inline void list_move_tail(struct list_head *node,
 #endif /* __LIST_HAVE_TYPEOF */
 
 /**
+ * iter_for_each_entry - iterate over list entries from @iter
+ * @entry: pointer used as iterator
+ * @iter: pointer to the start of this iteration
+ * @head: pointer to the head of the list
+ * @member: name of the list_head member variable in struct type of @entry
+ *
+ * FIXME: remove dependency of __typeof__ extension
+ */
+#ifdef __LIST_HAVE_TYPEOF
+#define iter_for_each_entry(entry, iter, head, member)                 \
+    for (entry = list_entry(iter, __typeof__(*entry), member);         \
+         &entry->member != (head);                                     \
+         entry = list_entry(entry->member.next, __typeof__(*entry), member))
+#endif /* __LIST_HAVE_TYPEOF */
+
+/**
  * list_for_each_safe - iterate over list nodes and allow deletes
  * @node: list_head pointer used as iterator
  * @safe: list_head pointer used to store info for next entry in list

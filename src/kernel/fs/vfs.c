@@ -321,6 +321,11 @@ int vfs_lookup(const char *pathname, struct vnode **target)
     return 0;
 }
 
+int vfs_sync(struct filesystem *fs)
+{
+    return fs->sync(fs);
+}
+
 static int do_open(const char *pathname, int flags)
 {
     int i, ret;
@@ -478,11 +483,24 @@ static int do_ioctl(int fd, uint64 request, va_list args)
     return ret;
 }
 
+static int do_sync(void)
+{
+    struct filesystem *entry;
+
+    list_for_each_entry(entry, &filesystems, fs_list) {
+        vfs_sync(entry);
+    }
+
+    return 0;
+}
+
 void syscall_open(trapframe *frame, const char *pathname, int flags)
 {
     int fd = do_open(pathname, flags);
 
     frame->x0 = fd;
+
+    uart_sync_printf("[open] (\"%s\", 0x%x) = %d\r\n", pathname, flags, fd);
 }
 
 void syscall_close(trapframe *frame, int fd)
@@ -490,6 +508,8 @@ void syscall_close(trapframe *frame, int fd)
     int ret = do_close(fd);
 
     frame->x0 = ret;
+
+    uart_sync_printf("[close] (%d) = %d\r\n", fd, ret);
 }
 
 void syscall_write(trapframe *frame, int fd, const void *buf, uint64 count)
@@ -497,6 +517,8 @@ void syscall_write(trapframe *frame, int fd, const void *buf, uint64 count)
     int ret = do_write(fd, buf, count);
 
     frame->x0 = ret;
+
+    uart_sync_printf("[write] (%d, \"%s\", 0x%x) = %d\r\n", fd, buf, count, ret);
 }
 
 void syscall_read(trapframe *frame, int fd, void *buf, uint64 count)
@@ -504,6 +526,8 @@ void syscall_read(trapframe *frame, int fd, void *buf, uint64 count)
     int ret = do_read(fd, buf, count);
 
     frame->x0 = ret;
+
+    uart_sync_printf("[read] (%d, \"%s\", 0x%x) = %d\r\n", fd, buf, count, ret);
 }
 
 void syscall_mkdir(trapframe *frame, const char *pathname, uint32 mode)
@@ -533,6 +557,8 @@ void syscall_lseek64(trapframe *frame, int fd, int64 offset, int whence)
     long ret = do_lseek64(fd, offset, whence);
 
     frame->x0 = ret;
+
+    uart_sync_printf("[lseek64] (%d, 0x%x, 0x%x) = %d\r\n", fd, offset, whence, ret);
 }
 
 void syscall_ioctl(trapframe *frame, int fd, uint64 request, ...)
@@ -547,4 +573,13 @@ void syscall_ioctl(trapframe *frame, int fd, uint64 request, ...)
     va_end(args);
 
     frame->x0 = ret;
+}
+
+void syscall_sync(trapframe *frame)
+{
+    int ret = do_sync();
+
+    frame->x0 = ret;
+
+    uart_sync_printf("[sync] = %d\r\n", ret);
 }

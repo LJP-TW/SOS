@@ -57,10 +57,12 @@ static struct vnode mount_old_node;
 static int cpio_mounted;
 
 static int cpiofs_mount(struct filesystem *fs, struct mount *mount);
+static int cpiofs_sync(struct filesystem *fs);
 
 static struct filesystem cpiofs = {
     .name = "cpiofs",
-    .mount = cpiofs_mount
+    .mount = cpiofs_mount,
+    .sync = cpiofs_sync
 };
 
 static int cpiofs_lookup(struct vnode *dir_node, struct vnode **target,
@@ -136,6 +138,11 @@ static int cpiofs_mount(struct filesystem *fs, struct mount *mount)
     oldnode->f_ops = cpio_root_node.f_ops;
     oldnode->internal = internal;
 
+    return 0;
+}
+
+static int cpiofs_sync(struct filesystem *fs)
+{
     return 0;
 }
 
