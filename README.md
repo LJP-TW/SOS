@@ -1,10 +1,8 @@
-# My OSC 2022
+# SOS
 
-## Author
+Small Operating System runs on Raspberry Pi 3 Model B+.
 
-| 學號 | GitHub 帳號 | 姓名 | Email |
-| --- | ----------- | --- | --- |
-|`310555003`| `LJP-TW` | `張書銘` | ljp.cs10@nycu.edu.tw |
+NYCU OSDI Spring 2022 Project.
 
 ## How to build
 
@@ -54,5 +52,17 @@ sudo ./tools/loadkernel.py /dev/pts/<pts_id> build/kernel8.img
 ## How to burn it into pi3
 
 ```
-dd if=./build/myos.img of=/dev/<your SD card device>
+sudo dd if=./build/myos.img of=/dev/<your SD card device>
 ```
+
+## Directory
+
+| Dir | Comment |
+| --- | --- |
+| build | The compiled object files, images of bootloader, kernel, the initramfs.cpio and the fat32 image |
+| img | The files that will be stored to the fat32 image |
+| include | Header files |
+| initramfs | The files that will be stored to the initramfs.cpio (initramfs.cpio will be stored to the fat32 image) |
+| mnt | The tool scripts will use it to create the fat32 image |
+| src | Source code files |
+| tools | Some helper scripts |
